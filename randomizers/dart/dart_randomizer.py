@@ -25,7 +25,7 @@ class DartRandomizer(BaseRandomizer):
 
     def _initialize(self) -> None:
         """Load flight textures."""
-        base_path = self.base_path / "assets/textures/dart/flight"
+        base_path = self.base_path / "assets/Textures/Dart/Flight"
         self.flight_textures_flags = self._load_textures(base_path / "flags")
         self.flight_textures_outpainted = self._load_textures(base_path / "outpainted")
 
