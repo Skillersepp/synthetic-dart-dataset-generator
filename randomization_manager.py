@@ -1,6 +1,7 @@
 from pathlib import Path
 from randomizers.camera import CameraRandomizer, CameraRandomConfig
 from randomizers.scene import SceneRandomizer, SceneRandomConfig
+from randomizers.dartboard import DartboardRandomizer, DartboardRandomConfig, RangeOrFixed
 
 
 class RandomizationManager:
@@ -29,6 +30,21 @@ class RandomizationManager:
             config=scene_cfg,
             base_path=self.base_path
         )
+        
+        # Dartboard Randomizer with default config
+        dartboard_cfg = DartboardRandomConfig(
+            randomize_cracks=True,
+            randomize_holes=True,
+            randomize_wear=True,
+            crack_factor=RangeOrFixed(0.0, 1.0),
+            hole_factor=RangeOrFixed(0.0, 1.0),
+            wear_level=RangeOrFixed(0.0, 1.0),
+            wear_contrast=RangeOrFixed(0.5, 1.0),
+        )
+        self.dartboard_randomizer = DartboardRandomizer(
+            seed=self._make_seed("dartboard", 0),
+            config=dartboard_cfg
+        )
 
     def _make_seed(self, tag: str, index: int) -> int:
         """Deterministic sub-seed generation."""
@@ -50,3 +66,8 @@ class RandomizationManager:
         scene_seed = self._make_seed("scene", image_index)
         self.scene_randomizer.update_seed(scene_seed)
         self.scene_randomizer.randomize(scene)
+        
+        # Dartboard randomization
+        dartboard_seed = self._make_seed("dartboard", image_index)
+        self.dartboard_randomizer.update_seed(dartboard_seed)
+        self.dartboard_randomizer.randomize()

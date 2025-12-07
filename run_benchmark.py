@@ -6,7 +6,7 @@ import sys
 # --- KONFIGURATION ---
 
 # Anzahl der parallelen Blender-Instanzen
-NUM_INSTANCES = 1
+NUM_INSTANCES = 6
 
 # Pfade (Nutze r"..." Strings für Windows-Pfade, damit Backslashes kein Problem sind)
 BLENDER_EXE = r"C:\Program Files\Blender Foundation\Blender 4.5\blender.exe"

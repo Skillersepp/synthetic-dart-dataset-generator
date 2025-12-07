@@ -17,6 +17,8 @@ DEV_RELOAD = True  # auf False setzen für Produktion / schnelleren Lauf
 PROJECT_MODULES = [
 	"utils.math_utils",
 	"utils.camera_utils",
+	"utils.node_utils",
+	"utils.color_utils",
 	"randomizers.base_randomizer",
 	"randomizers.camera.camera_config",
 	"randomizers.camera.camera_randomizer",
@@ -24,6 +26,9 @@ PROJECT_MODULES = [
 	"randomizers.scene.scene_config",
 	"randomizers.scene.scene_randomizer",
 	"randomizers.scene",
+	"randomizers.dartboard.dartboard_config",
+	"randomizers.dartboard.dartboard_randomizer",
+	"randomizers.dartboard",
 	"randomization_manager",
 ]
 
