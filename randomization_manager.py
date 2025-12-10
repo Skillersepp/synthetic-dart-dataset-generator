@@ -1,7 +1,9 @@
+import hashlib
 from pathlib import Path
 from randomizers.camera import CameraRandomizer, CameraRandomConfig
 from randomizers.scene import SceneRandomizer, SceneRandomConfig
 from randomizers.dartboard import DartboardRandomizer, DartboardRandomConfig, RangeOrFixed
+from randomizers.dart import DartRandomizer, DartRandomConfig
 
 
 class RandomizationManager:
@@ -45,10 +47,20 @@ class RandomizationManager:
             seed=self._make_seed("dartboard", 0),
             config=dartboard_cfg
         )
+        
+        # Dart Randomizer
+        dart_cfg = DartRandomConfig()
+        self.dart_randomizer = DartRandomizer(
+            seed=self._make_seed("dart", 0),
+            config=dart_cfg
+        )
 
     def _make_seed(self, tag: str, index: int) -> int:
         """Deterministic sub-seed generation."""
-        return hash((self.global_seed, index, tag))
+        data = f"{self.global_seed}_{tag}_{index}".encode('utf-8')
+        digest = hashlib.md5(data).hexdigest()
+        # Convert hex digest to int and keep it within a reasonable range (32-bit)
+        return int(digest, 16) % (2**32)
 
     def randomize(self, image_index: int, camera, scene):
         """
@@ -71,3 +83,9 @@ class RandomizationManager:
         dartboard_seed = self._make_seed("dartboard", image_index)
         self.dartboard_randomizer.update_seed(dartboard_seed)
         self.dartboard_randomizer.randomize()
+        
+        # Dart randomization
+        dart_seed = self._make_seed("dart", image_index)
+        self.dart_randomizer.update_seed(dart_seed)
+        self.dart_randomizer.randomize()
+        print(f"Seeds - Camera: {cam_seed}, Scene: {scene_seed}, Dartboard: {dartboard_seed}, Dart: {dart_seed}")
