@@ -12,7 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 import bpy
 
-DEV_RELOAD = True  # auf False setzen für Produktion / schnelleren Lauf
+DEV_RELOAD = False  # Set to False for production / faster execution
 
 PROJECT_MODULES = [
 	"utils.math_utils",
@@ -29,25 +29,28 @@ PROJECT_MODULES = [
 	"randomizers.dartboard.dartboard_config",
 	"randomizers.dartboard.dartboard_randomizer",
 	"randomizers.dartboard",
+	"randomizers.dart.dart_config",
+	"randomizers.dart.dart_randomizer",
+	"randomizers.dart",
 	"randomization_manager",
 ]
 
 def _dev_hot_reload():
 	if not DEV_RELOAD:
 		return
-	# Dateisystem-Caches invalidieren (falls neue Dateien / Änderungen)
+	# Invalidate filesystem caches (in case of new files / changes)
 	importlib.invalidate_caches()
 	for mod_name in PROJECT_MODULES:
 		if mod_name in sys.modules:
 			try:
 				importlib.reload(sys.modules[mod_name])
 			except Exception as e:
-				print(f"[DEV_RELOAD] Fehler beim Reload von {mod_name}: {e}")
+				print(f"[DEV_RELOAD] Error reloading {mod_name}: {e}")
 		else:
 			try:
 				__import__(mod_name)
 			except Exception as e:
-				print(f"[DEV_RELOAD] Fehler beim Erstimport von {mod_name}: {e}")
+				print(f"[DEV_RELOAD] Error importing {mod_name}: {e}")
 
 _dev_hot_reload()
 
@@ -56,7 +59,7 @@ from randomization_manager import RandomizationManager
 from bpy.app.handlers import persistent
 
 manager = RandomizationManager(global_seed=0, base_path=PROJECT_ROOT)
-bpy.context.scene.render.use_lock_interface = True  # UI sperren während Rendern
+bpy.context.scene.render.use_lock_interface = True  # Lock UI during rendering
 
 @persistent
 def on_frame_change(scene):
@@ -77,14 +80,14 @@ def on_frame_change(scene):
 	except Exception as e:
 		print(f"Error in frame change handler: {e}")
 
-# Event anhängen
-# Alten Handler entfernen, falls vorhanden (um Duplikate bei Reload zu vermeiden)
+# Register event handler
+# Remove old handler if present (to avoid duplicates on reload)
 handlers_to_remove = [h for h in bpy.app.handlers.frame_change_pre if h.__name__ == "on_frame_change"]
 for h in handlers_to_remove:
     bpy.app.handlers.frame_change_pre.remove(h)
 
 bpy.app.handlers.frame_change_pre.append(on_frame_change)
-print(f"Frame Change Handler registriert (Anzahl Handler: {len(bpy.app.handlers.frame_change_pre)})")
+print(f"Frame Change Handler registered (Count: {len(bpy.app.handlers.frame_change_pre)})")
 
 
 	

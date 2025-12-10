@@ -95,7 +95,7 @@ class DartboardRandomConfig:
     field_color_white: ColorVariation = field(default_factory=lambda: ColorVariation(
         base_color=(0.9, 0.9, 0.85, 1.0),
         hue_variation=0.0,
-        saturation_variation=0.05,
+        saturation_variation=0.5,
         value_variation=0.1,
         randomize=True
     ))
