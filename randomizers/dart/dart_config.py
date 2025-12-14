@@ -37,4 +37,18 @@ class DartRandomConfig:
     
     # Flight Selection
     randomize_flight_type: bool = True
-    fixed_flight_index: int = 0
+    fixed_flight_index: int = 100
+
+    # Flight Material
+    prob_flight_texture_flags: float = 0.3
+    prob_flight_texture_outpainted: float = 0.5
+    prob_flight_gradient: float = 0.1
+    prob_flight_solid: float = 0.1
+    
+    flight_roughness: RangeOrFixed = field(default_factory=lambda: RangeOrFixed(0.0, 1.0))
+    
+    # Color generation settings for gradient/solid
+    flight_color_saturation_min: float = 0.5
+    flight_color_saturation_max: float = 1.0
+    flight_color_value_min: float = 0.5
+    flight_color_value_max: float = 1.0

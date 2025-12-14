@@ -12,7 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 import bpy
 
-DEV_RELOAD = False  # Set to False for production / faster execution
+DEV_RELOAD = True  # Set to False for production / faster execution
 
 PROJECT_MODULES = [
 	"utils.math_utils",
