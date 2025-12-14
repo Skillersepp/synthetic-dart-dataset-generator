@@ -52,7 +52,8 @@ class RandomizationManager:
         dart_cfg = DartRandomConfig()
         self.dart_randomizer = DartRandomizer(
             seed=self._make_seed("dart", 0),
-            config=dart_cfg
+            config=dart_cfg,
+            base_path=self.base_path
         )
 
     def _make_seed(self, tag: str, index: int) -> int:
@@ -88,4 +89,3 @@ class RandomizationManager:
         dart_seed = self._make_seed("dart", image_index)
         self.dart_randomizer.update_seed(dart_seed)
         self.dart_randomizer.randomize()
-        print(f"Seeds - Camera: {cam_seed}, Scene: {scene_seed}, Dartboard: {dartboard_seed}, Dart: {dart_seed}")
