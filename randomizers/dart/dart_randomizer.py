@@ -57,6 +57,9 @@ class DartRandomizer(BaseRandomizer):
         """
         self._randomize_generators()
         self._randomize_flight_material()
+        self._randomize_shaft_material()
+        self._randomize_barrel_material()
+        self._randomize_tip_material()
         self._update_dart_size()
 
     def _get_geo_nodes_modifier_name(self, obj: bpy.types.Object) -> str:
@@ -170,14 +173,6 @@ class DartRandomizer(BaseRandomizer):
 
         mode = self.rng.choices(range(4), weights=probs, k=1)[0]
 
-        # Helper to generate random saturated color
-        def random_color():
-            h = self.rng.random()
-            s = self.rng.uniform(self.config.flight_color_saturation_min, self.config.flight_color_saturation_max)
-            v = self.rng.uniform(self.config.flight_color_value_min, self.config.flight_color_value_max)
-            r, g, b = colorsys.hsv_to_rgb(h, s, v)
-            return (r, g, b, 1.0)
-
         if mode == 0: # Flags
             self._set_flight_texture(group_node, self.flight_textures_flags)
             set_node_input(group_node, "Mix_factor_1", 0.0)
@@ -189,18 +184,145 @@ class DartRandomizer(BaseRandomizer):
             set_node_input(group_node, "Mix_factor_2", 0.0)
             
         elif mode == 2: # Gradient
-            col1 = random_color()
-            col2 = random_color()
+            col1 = self._get_random_color()
+            col2 = self._get_random_color()
             set_node_input(group_node, "Gradient_color_1", col1)
             set_node_input(group_node, "Gradient_color_2", col2)
             set_node_input(group_node, "Mix_factor_1", 1.0)
             set_node_input(group_node, "Mix_factor_2", 0.0)
             
         elif mode == 3: # Solid
-            col = random_color()
+            col = self._get_random_color()
             set_node_input(group_node, "Solid_color", col)
             # Mix_factor_1 can be anything, Mix_factor_2 must be 1.0
             set_node_input(group_node, "Mix_factor_2", 1.0)
+
+    def _randomize_shaft_material(self) -> None:
+        """Randomize the shaft material (gradient, solid color, roughness, metallic)."""
+        mat_name = "Shaft"
+        if mat_name not in bpy.data.materials:
+            print(f"[DartRandomizer] Material '{mat_name}' not found")
+            return
+            
+        material = bpy.data.materials[mat_name]
+        if not material.use_nodes:
+            return
+
+        # 1. Randomize Principled BSDF (Roughness, Metallic)
+        bsdf = None
+        for node in material.node_tree.nodes:
+            if node.type == 'BSDF_PRINCIPLED':
+                bsdf = node
+                break
+        
+        if bsdf:
+            # Roughness
+            roughness = self.config.shaft_roughness.get_value(self.rng)
+            set_node_input(bsdf, "Roughness", roughness)
+            
+            # Metallic
+            is_metallic = self.rng.random() < self.config.prob_shaft_metallic
+            set_node_input(bsdf, "Metallic", 1.0 if is_metallic else 0.0)
+
+        # 2. Find Shaft_Texture Node Group
+        group_node = find_node_group(material.node_tree, "Shaft_Texture")
+        if not group_node:
+            print(f"[DartRandomizer] Node Group 'Shaft_Texture' not found in material '{mat_name}'")
+            return
+
+        # 3. Determine Mode
+        # Modes: 0=Gradient, 1=Solid
+        probs = [
+            self.config.prob_shaft_gradient,
+            self.config.prob_shaft_solid
+        ]
+        
+        # Normalize
+        total_prob = sum(probs)
+        if total_prob > 0:
+            probs = [p / total_prob for p in probs]
+        else:
+            probs = [0.5, 0.5]
+
+        mode = self.rng.choices(range(2), weights=probs, k=1)[0]
+
+        if mode == 0: # Gradient
+            col1 = self._get_random_color()
+            col2 = self._get_random_color()
+            set_node_input(group_node, "Gradient_color_1", col1)
+            set_node_input(group_node, "Gradient_color_2", col2)
+            set_node_input(group_node, "Mix_factor", 0.0)
+            
+        elif mode == 1: # Solid
+            col = self._get_random_color()
+            set_node_input(group_node, "Solid_color", col)
+            set_node_input(group_node, "Mix_factor", 1.0)
+
+    def _randomize_barrel_material(self) -> None:
+        """Randomize the barrel material (seed, roughness)."""
+        mat_name = "Barrel_Domain_Randomization"
+        if mat_name not in bpy.data.materials:
+            print(f"[DartRandomizer] Material '{mat_name}' not found")
+            return
+            
+        material = bpy.data.materials[mat_name]
+        if not material.use_nodes:
+            return
+
+        # 1. Randomize Principled BSDF (Roughness)
+        bsdf = None
+        for node in material.node_tree.nodes:
+            if node.type == 'BSDF_PRINCIPLED':
+                bsdf = node
+                break
+        
+        if bsdf:
+            roughness = self.config.barrel_roughness.get_value(self.rng)
+            set_node_input(bsdf, "Roughness", roughness)
+
+        # 2. Find Node Group and set Seed
+        group_node = find_node_group(material.node_tree, "NG_Barrel_Domain_Randomization")
+        if group_node:
+            set_node_input(group_node, "Seed", self.rng.randint(0, 10000))
+        else:
+            print(f"[DartRandomizer] Node Group 'NG_Barrel_Domain_Randomization' not found in material '{mat_name}'")
+
+    def _randomize_tip_material(self) -> None:
+        """Randomize the tip material (seed, roughness)."""
+        mat_name = "Tip_Domain_Randomization"
+        if mat_name not in bpy.data.materials:
+            print(f"[DartRandomizer] Material '{mat_name}' not found")
+            return
+            
+        material = bpy.data.materials[mat_name]
+        if not material.use_nodes:
+            return
+
+        # 1. Randomize Principled BSDF (Roughness)
+        bsdf = None
+        for node in material.node_tree.nodes:
+            if node.type == 'BSDF_PRINCIPLED':
+                bsdf = node
+                break
+        
+        if bsdf:
+            roughness = self.config.tip_roughness.get_value(self.rng)
+            set_node_input(bsdf, "Roughness", roughness)
+
+        # 2. Find Node Group and set Seed
+        group_node = find_node_group(material.node_tree, "NG_Tip_Domain_Randomization")
+        if group_node:
+            set_node_input(group_node, "Seed", self.rng.randint(0, 10000))
+        else:
+            print(f"[DartRandomizer] Node Group 'NG_Tip_Domain_Randomization' not found in material '{mat_name}'")
+
+    def _get_random_color(self):
+        """Helper to generate random saturated color based on config."""
+        h = self.rng.random()
+        s = self.rng.uniform(self.config.flight_color_saturation_min, self.config.flight_color_saturation_max)
+        v = self.rng.uniform(self.config.flight_color_value_min, self.config.flight_color_value_max)
+        r, g, b = colorsys.hsv_to_rgb(h, s, v)
+        return (r, g, b, 1.0)
 
     def _set_flight_texture(self, group_node: bpy.types.Node, texture_list: List[bpy.types.Image]) -> None:
         """Pick a random texture from the list and assign it to the Image Texture node inside the group."""
