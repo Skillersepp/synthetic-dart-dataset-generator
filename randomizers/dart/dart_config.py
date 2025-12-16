@@ -26,7 +26,7 @@ class DartRandomConfig:
     
     # Barrel Generator
     barrel_length: RangeOrFixed = field(default_factory=lambda: RangeOrFixed(40.0, 55.0))
-    barrel_thickness: RangeOrFixed = field(default_factory=lambda: RangeOrFixed(0.15, 2.2))
+    barrel_thickness: RangeOrFixed = field(default_factory=lambda: RangeOrFixed(0.15, 5.0))
     
     # Shaft Generator
     shaft_length: RangeOrFixed = field(default_factory=lambda: RangeOrFixed(26.0, 56.0))
@@ -52,3 +52,16 @@ class DartRandomConfig:
     flight_color_saturation_max: float = 1.0
     flight_color_value_min: float = 0.5
     flight_color_value_max: float = 1.0
+
+    # Shaft Material
+    prob_shaft_gradient: float = 0.5
+    prob_shaft_solid: float = 0.5
+    
+    shaft_roughness: RangeOrFixed = field(default_factory=lambda: RangeOrFixed(0.0, 0.8))
+    prob_shaft_metallic: float = 0.5  # Probability of being metallic (1.0) vs dielectric (0.0)
+
+    # Barrel Material
+    barrel_roughness: RangeOrFixed = field(default_factory=lambda: RangeOrFixed(0.0, 0.5))
+
+    # Tip Material
+    tip_roughness: RangeOrFixed = field(default_factory=lambda: RangeOrFixed(0.0, 0.5))
