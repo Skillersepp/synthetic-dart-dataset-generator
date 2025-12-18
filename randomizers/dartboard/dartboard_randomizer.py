@@ -216,8 +216,8 @@ class DartboardRandomizer(BaseRandomizer):
         
         # Force dependency graph update to ensure geometry is recalculated
         # This is sometimes needed for Geometry Nodes to reflect changes immediately
-        if bpy.context.view_layer:
-            bpy.context.view_layer.update()
+        #if bpy.context.view_layer:
+        #    bpy.context.view_layer.update()
 
     # -------------------------------------------------------------------------
     # HELPER METHODS

@@ -485,7 +485,7 @@ class DartRandomizer(BaseRandomizer):
         and update the root Empty's display size.
         """
         # Update dependency graph to ensure geometry is up to date after parameter changes
-        bpy.context.view_layer.update()
+        #bpy.context.view_layer.update()
         
         if not root_obj:
             return
