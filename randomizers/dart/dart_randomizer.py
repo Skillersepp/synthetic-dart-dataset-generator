@@ -39,11 +39,12 @@ class DartRandomizer(BaseRandomizer):
         for img_file in path.glob("*"):
             if img_file.suffix.lower() in ['.png', '.jpg', '.jpeg', '.tif', '.tiff']:
                 try:
+                    # Remove existing image if present to force reload
                     if img_file.name in bpy.data.images:
-                        img = bpy.data.images[img_file.name]
-                    else:
-                        # Use absolute path to ensure Blender finds the file
-                        img = bpy.data.images.load(str(img_file.resolve()), check_existing=True)
+                        bpy.data.images.remove(bpy.data.images[img_file.name])
+
+                    # Use absolute path to ensure Blender finds the file
+                    img = bpy.data.images.load(str(img_file.resolve()), check_existing=True)
                     img.use_fake_user = True
                     images.append(img)
                 except Exception as e:

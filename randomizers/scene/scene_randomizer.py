@@ -51,16 +51,16 @@ class SceneRandomizer(BaseRandomizer):
         
         print(f"Loading {len(hdri_files)} HDRIs from {hdri_path}...")
         
+        # First, clear existing HDRIs to ensure fresh reload
+        for hdri_file in hdri_files:
+            if hdri_file.name in bpy.data.images:
+                bpy.data.images.remove(bpy.data.images[hdri_file.name])
+
         for hdri_file in hdri_files:
             try:
-                # Check if already loaded
-                if hdri_file.name in bpy.data.images:
-                    img = bpy.data.images[hdri_file.name]
-                    print(f"  - Using cached: {hdri_file.name}")
-                else:
-                    # Load new image
-                    img = bpy.data.images.load(str(hdri_file), check_existing=True)
-                    print(f"  - Loaded: {hdri_file.name}")
+                # Load new image
+                img = bpy.data.images.load(str(hdri_file), check_existing=True)
+                print(f"  - Loaded: {hdri_file.name}")
                 
                 # Ensure image persists in memory
                 img.use_fake_user = True
