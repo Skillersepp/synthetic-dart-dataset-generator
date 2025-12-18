@@ -1,4 +1,6 @@
 import hashlib
+import time
+import logging
 from pathlib import Path
 from randomizers.camera import CameraRandomizer, CameraRandomConfig
 from randomizers.scene import SceneRandomizer, SceneRandomConfig
@@ -79,22 +81,42 @@ class RandomizationManager:
         Updates seeds and performs lightweight randomization.
         No heavy loading occurs here.
         """
+        logger = logging.getLogger(__name__)
+        # Basic config if not already configured (ensures output to console)
+        if not logging.getLogger().handlers:
+            logging.basicConfig(level=logging.INFO, format='%(message)s')
+
+        start_time = time.perf_counter()
+
         # Camera randomization
+        t0 = time.perf_counter()
         cam_seed = self._make_seed("camera", image_index)
         self.camera_randomizer.update_seed(cam_seed)
         self.camera_randomizer.randomize(camera, scene)
+        t1 = time.perf_counter()
         
         # Scene randomization
         scene_seed = self._make_seed("scene", image_index)
         self.scene_randomizer.update_seed(scene_seed)
         self.scene_randomizer.randomize(scene)
+        t2 = time.perf_counter()
         
         # Dartboard randomization
         dartboard_seed = self._make_seed("dartboard", image_index)
         self.dartboard_randomizer.update_seed(dartboard_seed)
         self.dartboard_randomizer.randomize()
+        t3 = time.perf_counter()
         
         # Throw randomization (handles dart spawning and randomization)
         throw_seed = self._make_seed("throw", image_index)
         self.throw_randomizer.update_seed(throw_seed)
         self.throw_randomizer.randomize()
+        t4 = time.perf_counter()
+
+        logger.info(f"--- Randomization Timing (Frame {image_index}) ---")
+        logger.info(f"Camera:    {t1 - t0:.4f}s")
+        logger.info(f"Scene:     {t2 - t1:.4f}s")
+        logger.info(f"Dartboard: {t3 - t2:.4f}s")
+        logger.info(f"Throw:     {t4 - t3:.4f}s")
+        logger.info(f"Total:     {t4 - start_time:.4f}s")
+        logger.info("-------------------------------------------")
