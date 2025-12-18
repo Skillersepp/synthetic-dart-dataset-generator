@@ -51,16 +51,55 @@ class DartRandomizer(BaseRandomizer):
         print(f"[DartRandomizer] Loaded {len(images)} textures from {path}")
         return images
 
-    def randomize(self, *args, **kwargs) -> None:
+    def setup_geometry_references(self, root_obj: bpy.types.Object) -> None:
+        """
+        Links the Geometry Nodes 'Parent_Object' inputs for the dart hierarchy.
+        Should be called once after spawning a new dart instance.
+        """
+        tip = self._find_child_by_name(root_obj, "Tip_Generator")
+        barrel = self._find_child_by_name(root_obj, "Barrel_Generator")
+        shaft = self._find_child_by_name(root_obj, "Shaft_Generator")
+        flight = self._find_child_by_name(root_obj, "Flight_Generator")
+
+        # Barrel needs Tip
+        if barrel and tip:
+            mod_name = self._get_geo_nodes_modifier_name(barrel)
+            set_geometry_node_input(barrel, mod_name, "Parent_Object", tip)
+        
+        # Shaft needs Barrel
+        if shaft and barrel:
+            mod_name = self._get_geo_nodes_modifier_name(shaft)
+            set_geometry_node_input(shaft, mod_name, "Parent_Object", barrel)
+            
+        # Flight needs Shaft
+        if flight and shaft:
+            mod_name = self._get_geo_nodes_modifier_name(flight)
+            set_geometry_node_input(flight, mod_name, "Parent_Object", shaft)
+
+    def randomize(self, root_obj: Optional[bpy.types.Object] = None) -> None:
         """
         Randomize the dart parameters and update the container size.
+        
+        Args:
+            root_obj: The root object of the dart hierarchy to randomize.
+                      If None, defaults to finding "Dart_Generator" in the scene.
         """
-        self._randomize_generators()
-        self._randomize_flight_material()
-        self._randomize_shaft_material()
-        self._randomize_barrel_material()
-        self._randomize_tip_material()
-        self._update_dart_size()
+        if root_obj is None:
+            root_obj = bpy.data.objects.get("Dart_Generator")
+            
+        if not root_obj:
+            print("[DartRandomizer] No root object found/provided.")
+            return
+
+        self._randomize_generators(root_obj)
+        
+        # Pass root_obj to material randomizers to find instance-specific materials
+        self._randomize_flight_material(root_obj)
+        self._randomize_shaft_material(root_obj)
+        self._randomize_barrel_material(root_obj)
+        self._randomize_tip_material(root_obj)
+        
+        self._update_dart_size(root_obj)
 
     def _get_geo_nodes_modifier_name(self, obj: bpy.types.Object) -> str:
         """Find the first Geometry Nodes modifier on the object."""
@@ -68,10 +107,37 @@ class DartRandomizer(BaseRandomizer):
             if mod.type == 'NODES':
                 return mod.name
         return "GeometryNodes"
+        
+    def _find_child_by_name(self, root: bpy.types.Object, name: str) -> Optional[bpy.types.Object]:
+        """Find a child object by name (startswith) within the hierarchy."""
+        if root.name.startswith(name):
+            return root
+        for child in root.children:
+            found = self._find_child_by_name(child, name)
+            if found:
+                return found
+        return None
 
-    def _randomize_generators(self) -> None:
+    def _get_material_from_generator(self, root_obj: bpy.types.Object, generator_name: str, material_prefix: str) -> Optional[bpy.types.Material]:
+        """Helper to find a material on a generator object or its children."""
+        gen_obj = self._find_child_by_name(root_obj, generator_name)
+        if not gen_obj:
+            return None
+            
+        # Check generator object itself
+        if gen_obj.active_material and gen_obj.active_material.name.startswith(material_prefix):
+            return gen_obj.active_material
+            
+        # Check children (e.g. the mesh object inside the generator)
+        for child in gen_obj.children:
+            if child.active_material and child.active_material.name.startswith(material_prefix):
+                return child.active_material
+        
+        return None
+
+    def _randomize_generators(self, root_obj: bpy.types.Object) -> None:
         # 1. Tip Generator
-        tip_obj = bpy.data.objects.get("Tip_Generator")
+        tip_obj = self._find_child_by_name(root_obj, "Tip_Generator")
         if tip_obj:
             mod_name = self._get_geo_nodes_modifier_name(tip_obj)
             length = self.config.tip_length.get_value(self.rng)
@@ -80,7 +146,7 @@ class DartRandomizer(BaseRandomizer):
             tip_obj.update_tag()
 
         # 2. Barrel Generator
-        barrel_obj = bpy.data.objects.get("Barrel_Generator")
+        barrel_obj = self._find_child_by_name(root_obj, "Barrel_Generator")
         if barrel_obj:
             mod_name = self._get_geo_nodes_modifier_name(barrel_obj)
             length = self.config.barrel_length.get_value(self.rng)
@@ -91,7 +157,7 @@ class DartRandomizer(BaseRandomizer):
             barrel_obj.update_tag()
 
         # 3. Shaft Generator
-        shaft_obj = bpy.data.objects.get("Shaft_Generator")
+        shaft_obj = self._find_child_by_name(root_obj, "Shaft_Generator")
         if shaft_obj:
             mod_name = self._get_geo_nodes_modifier_name(shaft_obj)
             length = self.config.shaft_length.get_value(self.rng)
@@ -102,7 +168,7 @@ class DartRandomizer(BaseRandomizer):
             shaft_obj.update_tag()
 
         # 4. Flight Generator
-        flight_obj = bpy.data.objects.get("Flight_Generator")
+        flight_obj = self._find_child_by_name(root_obj, "Flight_Generator")
         if flight_obj:
             mod_name = self._get_geo_nodes_modifier_name(flight_obj)
             depth = self.config.flight_insertion_depth.get_value(self.rng)
@@ -121,20 +187,52 @@ class DartRandomizer(BaseRandomizer):
             
             flight_obj.update_tag()
 
-    def _randomize_flight_material(self) -> None:
-        """Randomize the flight material (texture, gradient, solid color, roughness)."""
-        # Find the material on the Flight object (or Flight_Generator)
-        # Assuming the material is named "Flight" and is on the Flight_Generator or its instances
-        # Since Flight_Generator generates instances, we might need to check the original objects in the "Flights" collection
-        # OR if the material is on the Flight_Generator itself (if it overrides).
-        # Based on user description, let's look for material "Flight" in bpy.data.materials
-        
-        mat_name = "Flight"
-        if mat_name not in bpy.data.materials:
-            print(f"[DartRandomizer] Material '{mat_name}' not found")
+    def _assign_material_to_modifier(self, obj: bpy.types.Object, material: bpy.types.Material) -> None:
+        """
+        Assigns the given material to the Geometry Nodes modifier input named 'Material'.
+        This ensures the Geometry Nodes use the unique material instance.
+        """
+        mod_name = self._get_geo_nodes_modifier_name(obj)
+        # Try to set "Material" input
+        set_geometry_node_input(obj, mod_name, "Material", material)
+
+    def _ensure_unique_node_group(self, group_node: bpy.types.Node) -> None:
+        """
+        Ensures that the node group used by this node is unique (a copy).
+        This prevents changes to the node group from affecting other materials/objects.
+        """
+        if not group_node.node_tree:
             return
             
-        material = bpy.data.materials[mat_name]
+        # Check if the node tree has users > 1 (meaning it's shared)
+        # Note: This check might be tricky because we just copied the material, 
+        # so the material itself is a user. If we have 3 darts, we have 3 materials using this group.
+        # So users should be > 1.
+        
+        # Simply duplicate it to be safe and assign the copy
+        # We append a suffix to identify it as a unique copy
+        original_tree = group_node.node_tree
+        new_tree = original_tree.copy()
+        new_tree.name = f"{original_tree.name}_Unique"
+        group_node.node_tree = new_tree
+
+    def _randomize_flight_material(self, root_obj: bpy.types.Object) -> None:
+        """Randomize the flight material (texture, gradient, solid color, roughness)."""
+        material = self._get_material_from_generator(root_obj, "Flight_Generator", "Flight")
+        
+        if not material:
+            # Fallback to global lookup if not found on object (legacy behavior)
+            if "Flight" in bpy.data.materials:
+                material = bpy.data.materials["Flight"]
+            else:
+                print(f"[DartRandomizer] Material 'Flight' not found on object or globally")
+                return
+
+        # Ensure Geometry Nodes use this specific material instance
+        gen_obj = self._find_child_by_name(root_obj, "Flight_Generator")
+        if gen_obj:
+             self._assign_material_to_modifier(gen_obj, material)
+            
         if not material.use_nodes:
             return
 
@@ -152,8 +250,12 @@ class DartRandomizer(BaseRandomizer):
         # 2. Find Flight_Texture Node Group
         group_node = find_node_group(material.node_tree, "Flight_Texture")
         if not group_node:
-            print(f"[DartRandomizer] Node Group 'Flight_Texture' not found in material '{mat_name}'")
+            print(f"[DartRandomizer] Node Group 'Flight_Texture' not found in material '{material.name}'")
             return
+            
+        # IMPORTANT: Make the node group unique for this material instance
+        # because we might modify its internal nodes (Image Texture)
+        self._ensure_unique_node_group(group_node)
 
         # 3. Determine Mode
         # Modes: 0=Flags, 1=Outpainted, 2=Gradient, 3=Solid
@@ -197,14 +299,22 @@ class DartRandomizer(BaseRandomizer):
             # Mix_factor_1 can be anything, Mix_factor_2 must be 1.0
             set_node_input(group_node, "Mix_factor_2", 1.0)
 
-    def _randomize_shaft_material(self) -> None:
+    def _randomize_shaft_material(self, root_obj: bpy.types.Object) -> None:
         """Randomize the shaft material (gradient, solid color, roughness, metallic)."""
-        mat_name = "Shaft"
-        if mat_name not in bpy.data.materials:
-            print(f"[DartRandomizer] Material '{mat_name}' not found")
-            return
+        material = self._get_material_from_generator(root_obj, "Shaft_Generator", "Shaft")
+        
+        if not material:
+            if "Shaft" in bpy.data.materials:
+                material = bpy.data.materials["Shaft"]
+            else:
+                print(f"[DartRandomizer] Material 'Shaft' not found")
+                return
+
+        # Ensure Geometry Nodes use this specific material instance
+        gen_obj = self._find_child_by_name(root_obj, "Shaft_Generator")
+        if gen_obj:
+             self._assign_material_to_modifier(gen_obj, material)
             
-        material = bpy.data.materials[mat_name]
         if not material.use_nodes:
             return
 
@@ -227,8 +337,18 @@ class DartRandomizer(BaseRandomizer):
         # 2. Find Shaft_Texture Node Group
         group_node = find_node_group(material.node_tree, "Shaft_Texture")
         if not group_node:
-            print(f"[DartRandomizer] Node Group 'Shaft_Texture' not found in material '{mat_name}'")
+            print(f"[DartRandomizer] Node Group 'Shaft_Texture' not found in material '{material.name}'")
             return
+            
+        # IMPORTANT: Make the node group unique for this material instance
+        # Although Shaft_Texture currently only uses inputs (which are on the node instance),
+        # if we ever change internals, we need this. 
+        # Currently we only set inputs on the group node, so strictly speaking duplication isn't needed 
+        # IF we only touch inputs. But if we change internal structure or defaults, we need it.
+        # However, the user reported issues, so let's be safe.
+        # Actually, for Shaft we only use set_node_input on the group node itself, which is unique per material.
+        # But let's duplicate it anyway to be consistent with "Deep Copy" philosophy requested.
+        self._ensure_unique_node_group(group_node)
 
         # 3. Determine Mode
         # Modes: 0=Gradient, 1=Solid
@@ -258,14 +378,22 @@ class DartRandomizer(BaseRandomizer):
             set_node_input(group_node, "Solid_color", col)
             set_node_input(group_node, "Mix_factor", 1.0)
 
-    def _randomize_barrel_material(self) -> None:
+    def _randomize_barrel_material(self, root_obj: bpy.types.Object) -> None:
         """Randomize the barrel material (seed, roughness)."""
-        mat_name = "Barrel_Domain_Randomization"
-        if mat_name not in bpy.data.materials:
-            print(f"[DartRandomizer] Material '{mat_name}' not found")
-            return
+        material = self._get_material_from_generator(root_obj, "Barrel_Generator", "Barrel_Domain_Randomization")
+        
+        if not material:
+            if "Barrel_Domain_Randomization" in bpy.data.materials:
+                material = bpy.data.materials["Barrel_Domain_Randomization"]
+            else:
+                print(f"[DartRandomizer] Material 'Barrel_Domain_Randomization' not found")
+                return
+
+        # Ensure Geometry Nodes use this specific material instance
+        gen_obj = self._find_child_by_name(root_obj, "Barrel_Generator")
+        if gen_obj:
+             self._assign_material_to_modifier(gen_obj, material)
             
-        material = bpy.data.materials[mat_name]
         if not material.use_nodes:
             return
 
@@ -287,14 +415,22 @@ class DartRandomizer(BaseRandomizer):
         else:
             print(f"[DartRandomizer] Node Group 'NG_Barrel_Domain_Randomization' not found in material '{mat_name}'")
 
-    def _randomize_tip_material(self) -> None:
+    def _randomize_tip_material(self, root_obj: bpy.types.Object) -> None:
         """Randomize the tip material (seed, roughness)."""
-        mat_name = "Tip_Domain_Randomization"
-        if mat_name not in bpy.data.materials:
-            print(f"[DartRandomizer] Material '{mat_name}' not found")
-            return
+        material = self._get_material_from_generator(root_obj, "Tip_Generator", "Tip_Domain_Randomization")
+        
+        if not material:
+            if "Tip_Domain_Randomization" in bpy.data.materials:
+                material = bpy.data.materials["Tip_Domain_Randomization"]
+            else:
+                print(f"[DartRandomizer] Material 'Tip_Domain_Randomization' not found")
+                return
+
+        # Ensure Geometry Nodes use this specific material instance
+        gen_obj = self._find_child_by_name(root_obj, "Tip_Generator")
+        if gen_obj:
+             self._assign_material_to_modifier(gen_obj, material)
             
-        material = bpy.data.materials[mat_name]
         if not material.use_nodes:
             return
 
@@ -314,7 +450,7 @@ class DartRandomizer(BaseRandomizer):
         if group_node:
             set_node_input(group_node, "Seed", self.rng.randint(0, 10000))
         else:
-            print(f"[DartRandomizer] Node Group 'NG_Tip_Domain_Randomization' not found in material '{mat_name}'")
+            print(f"[DartRandomizer] Node Group 'NG_Tip_Domain_Randomization' not found in material '{material.name}'")
 
     def _get_random_color(self):
         """Helper to generate random saturated color based on config."""
@@ -343,7 +479,7 @@ class DartRandomizer(BaseRandomizer):
         else:
             print("[DartRandomizer] Image Texture node not found inside 'Flight_Texture' group")
 
-    def _update_dart_size(self) -> None:
+    def _update_dart_size(self, root_obj: bpy.types.Object) -> None:
         """
         Calculate the total length of the dart along its local Z axis
         and update the root Empty's display size.
@@ -351,7 +487,6 @@ class DartRandomizer(BaseRandomizer):
         # Update dependency graph to ensure geometry is up to date after parameter changes
         bpy.context.view_layer.update()
         
-        root_obj = bpy.data.objects.get("Dart_Generator")
         if not root_obj:
             return
 
