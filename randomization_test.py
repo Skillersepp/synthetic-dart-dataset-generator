@@ -32,6 +32,9 @@ PROJECT_MODULES = [
 	"randomizers.dart.dart_config",
 	"randomizers.dart.dart_randomizer",
 	"randomizers.dart",
+	"randomizers.throw.throw_config",
+	"randomizers.throw.throw_randomizer",
+	"randomizers.throw",
 	"randomization_manager",
 ]
 

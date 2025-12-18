@@ -4,6 +4,7 @@ from randomizers.camera import CameraRandomizer, CameraRandomConfig
 from randomizers.scene import SceneRandomizer, SceneRandomConfig
 from randomizers.dartboard import DartboardRandomizer, DartboardRandomConfig, RangeOrFixed
 from randomizers.dart import DartRandomizer, DartRandomConfig
+from randomizers.throw import ThrowRandomizer, ThrowRandomConfig
 
 
 class RandomizationManager:
@@ -55,6 +56,14 @@ class RandomizationManager:
             config=dart_cfg,
             base_path=self.base_path
         )
+        
+        # Throw Randomizer
+        throw_cfg = ThrowRandomConfig()
+        self.throw_randomizer = ThrowRandomizer(
+            seed=self._make_seed("throw", 0),
+            config=throw_cfg,
+            dart_randomizer=self.dart_randomizer
+        )
 
     def _make_seed(self, tag: str, index: int) -> int:
         """Deterministic sub-seed generation."""
@@ -85,7 +94,7 @@ class RandomizationManager:
         self.dartboard_randomizer.update_seed(dartboard_seed)
         self.dartboard_randomizer.randomize()
         
-        # Dart randomization
-        dart_seed = self._make_seed("dart", image_index)
-        self.dart_randomizer.update_seed(dart_seed)
-        self.dart_randomizer.randomize()
+        # Throw randomization (handles dart spawning and randomization)
+        throw_seed = self._make_seed("throw", image_index)
+        self.throw_randomizer.update_seed(throw_seed)
+        self.throw_randomizer.randomize()
