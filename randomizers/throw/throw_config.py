@@ -25,3 +25,7 @@ class ThrowRandomConfig:
     rot_y_max: float = 10.0
     rot_z_min: float = 0.0
     rot_z_max: float = 360.0
+
+    # Embedding depth (factor of tip length)
+    embed_depth_factor_min: float = 0.1
+    embed_depth_factor_max: float = 0.8
