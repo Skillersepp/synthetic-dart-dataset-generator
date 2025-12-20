@@ -6,6 +6,7 @@ from mathutils import Vector, Euler
 from randomizers.base_randomizer import BaseRandomizer
 from .throw_config import ThrowRandomConfig
 from randomizers.dart.dart_randomizer import DartRandomizer
+from randomizers.dart.dart import Dart
 
 class ThrowRandomizer(BaseRandomizer):
     """
@@ -19,7 +20,7 @@ class ThrowRandomizer(BaseRandomizer):
 
     def __init__(self, seed: int, config: Optional[ThrowRandomConfig] = None, dart_randomizer: DartRandomizer = None):
         self.dart_randomizer = dart_randomizer
-        self.spawned_darts: List[bpy.types.Object] = []
+        self.spawned_darts: List[Dart] = []
         self.spawned_k_points: List[bpy.types.Object] = []
         self.template_dart_name = "Dart_Generator"
         self.template_k_name = "Dart_K"
@@ -84,19 +85,29 @@ class ThrowRandomizer(BaseRandomizer):
             # 1. Spawn Dart
             new_dart_root = self._duplicate_hierarchy(template_dart, linked=use_linked)
             if new_dart_root:
-                self.spawned_darts.append(new_dart_root)
+                # Create Dart wrapper
+                dart_instance = Dart(new_dart_root)
+                self.spawned_darts.append(dart_instance)
                 
                 # Setup geometry references (Parent_Object links)
                 if self.dart_randomizer:
-                    self.dart_randomizer.setup_geometry_references(new_dart_root)
+                    self.dart_randomizer.setup_geometry_references(dart_instance)
             
             # 2. Spawn K-Point
             if template_k:
                 new_k = template_k.copy()
+                # Ensure visibility is enabled (template might be hidden)
+                new_k.hide_viewport = False
+                new_k.hide_render = False
+                
                 # Link to collection
                 if self.collection:
                     self.collection.objects.link(new_k)
                 self.spawned_k_points.append(new_k)
+                
+                # Associate K-Point with Dart instance
+                if new_dart_root and self.spawned_darts:
+                    self.spawned_darts[-1].k_point = new_k
         
         # Ensure template collection is hidden if possible
         if template_dart.users_collection:
@@ -115,11 +126,11 @@ class ThrowRandomizer(BaseRandomizer):
         """
         # Safety check: if pool is empty or size mismatch (e.g. config changed), respawn
         # Check if objects in spawned_darts are valid (not deleted)
-        self.spawned_darts = [d for d in self.spawned_darts if d is not None]
+        self.spawned_darts = [d for d in self.spawned_darts if d is not None and d.root is not None]
         self.spawned_k_points = [k for k in self.spawned_k_points if k is not None]
         
         # Also check if they are actually in the scene/collection
-        self.spawned_darts = [d for d in self.spawned_darts if not self.collection or d.name in self.collection.objects]
+        # self.spawned_darts = [d for d in self.spawned_darts if not self.collection or d.root.name in self.collection.objects]
 
         if len(self.spawned_darts) != self.config.num_darts:
              print(f"[ThrowRandomizer] Dart count mismatch ({len(self.spawned_darts)} != {self.config.num_darts}). Respawning pool.")
@@ -128,8 +139,8 @@ class ThrowRandomizer(BaseRandomizer):
 
         base_seed = self.rng.randint(0, 100000)
         
-        for i, dart_root in enumerate(self.spawned_darts):
-            if not dart_root: continue
+        for i, dart in enumerate(self.spawned_darts):
+            if not dart or not dart.root: continue
             
             # Randomize Appearance
             if self.dart_randomizer:
@@ -140,54 +151,43 @@ class ThrowRandomizer(BaseRandomizer):
                     dart_seed = self.rng.randint(0, 100000)
                 
                 self.dart_randomizer.update_seed(dart_seed)
-                self.dart_randomizer.randomize(root_obj=dart_root)
+                self.dart_randomizer.randomize(dart=dart)
             
             # Randomize Position/Rotation
-            self._randomize_transform(dart_root)
+            self._randomize_transform(dart.root)
             
             # Handle K-Point and Embedding
-            if i < len(self.spawned_k_points):
-                k_point = self.spawned_k_points[i]
-                if k_point:
-                    # 1. Move K-Point to Dart's surface position
-                    k_point.location = dart_root.location
-                    k_point.rotation_euler = dart_root.rotation_euler
-                    
-                    # 2. Calculate Embedding Depth
-                    # Get tip length from the dart instance
-                    tip_length = 0.0
-                    if self.dart_randomizer:
-                        # We need to find the Tip_Generator of THIS dart instance
-                        tip_obj = self.dart_randomizer._find_child_by_name(dart_root, "Tip_Generator")
-                        if tip_obj:
-                            # Try to read modifier value
-                            mod_name = self.dart_randomizer._get_geo_nodes_modifier_name(tip_obj)
-                            try:
-                                from utils.node_utils import get_geometry_node_input
-                                val = get_geometry_node_input(tip_obj, mod_name, "Length")
-                                if val is not None:
-                                    tip_length = float(val)
-                            except:
-                                pass
-
-                    # If reading failed, fallback to a default
-                    if tip_length == 0.0:
-                        tip_length = 0.03 # Fallback 3cm
-                    
-                    embed_factor = self.rng.uniform(self.config.embed_depth_factor_min, self.config.embed_depth_factor_max)
-                    embed_depth = tip_length * embed_factor
-                    
-                    # 3. Move Dart INTO the board
-                    # Assuming Dart points in local Z direction (or whatever direction the arrow points)
-                    # If arrow points AWAY from board, then +Z is AWAY.
-                    # To move INTO board, we need to move in -Z direction.
-                    
-                    # Calculate translation vector in local space
-                    local_translation = Vector((0, 0, -embed_depth))
-                    
-                    # Apply to world location
-                    # location += rotation @ local_translation
-                    dart_root.location += dart_root.rotation_euler.to_matrix() @ local_translation
+            if dart.k_point:
+                k_point = dart.k_point
+                # 1. Move K-Point to Dart's surface position
+                k_point.location = dart.root.location
+                k_point.rotation_euler = dart.root.rotation_euler
+                
+                # 2. Calculate Embedding Depth
+                # Get tip length from the dart instance (cached!)
+                # Value is in mm (from config/GeoNodes), convert to meters for world space transform
+                tip_length_mm = dart.tip_length
+                
+                # If reading failed (shouldn't happen if randomized), fallback
+                if tip_length_mm == 0.0:
+                    tip_length_mm = 30.0 # Fallback 30mm
+                
+                tip_length_m = tip_length_mm / 1000.0
+                
+                embed_factor = self.rng.uniform(self.config.embed_depth_factor_min, self.config.embed_depth_factor_max)
+                embed_depth_m = tip_length_m * embed_factor
+                
+                # 3. Move Dart INTO the board
+                # Assuming Dart points in local Z direction (or whatever direction the arrow points)
+                # If arrow points AWAY from board, then +Z is AWAY.
+                # To move INTO board, we need to move in -Z direction.
+                
+                # Calculate translation vector in local space
+                local_translation = Vector((0, 0, -embed_depth_m))
+                
+                # Apply to world location
+                # location += rotation @ local_translation
+                dart.root.location += dart.root.rotation_euler.to_matrix() @ local_translation
 
     def _duplicate_hierarchy(self, root_obj: bpy.types.Object, linked: bool = False) -> bpy.types.Object:
         """
