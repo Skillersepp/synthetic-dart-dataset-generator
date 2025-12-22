@@ -22,15 +22,13 @@ class DartRandomizer(BaseRandomizer):
         self.base_path = base_path or Path.cwd()
         self.flight_textures_flags: List[bpy.types.Image] = []
         self.flight_textures_outpainted: List[bpy.types.Image] = []
-        self.flight_lengths: Dict[int, float] = {}
         super().__init__(seed, config or DartRandomConfig())
 
     def _initialize(self) -> None:
-        """Load flight textures and cache geometry."""
+        """Load flight textures."""
         base_path = self.base_path / "assets/Textures/Dart/Flight"
         self.flight_textures_flags = self._load_textures(base_path / "flags")
         self.flight_textures_outpainted = self._load_textures(base_path / "outpainted")
-        self._cache_flight_lengths()
 
     def _load_textures(self, path: Path) -> List[bpy.types.Image]:
         """Load all images from a directory."""
@@ -58,48 +56,6 @@ class DartRandomizer(BaseRandomizer):
                     print(f"[DartRandomizer] Failed to load texture {img_file}: {e}")
         print(f"[DartRandomizer] Loaded {len(images)} textures from {path}")
         return images
-
-    def _cache_flight_lengths(self) -> None:
-        """
-        Finds the collection containing flight meshes and caches their lengths.
-        This allows for exact dart size calculation without depsgraph updates.
-        """
-        self.flight_lengths = {}
-        
-        # Try to find the collection
-        collection = None
-        candidates = ["Flights", "Flight", "flights", "flight", "Flight_Shapes", "Flight_Collection"]
-        
-        # 1. Exact match
-        for name in candidates:
-            if name in bpy.data.collections:
-                collection = bpy.data.collections[name]
-                break
-        
-        # 2. Partial match if not found
-        if not collection:
-            for col in bpy.data.collections:
-                if "flight" in col.name.lower() and len(col.objects) > 5:
-                    collection = col
-                    break
-        
-        if not collection:
-            print("[DartRandomizer] Warning: Could not find Flight collection. Dart sizes will be estimated.")
-            return
-
-        print(f"[DartRandomizer] Found Flight collection: {collection.name} with {len(collection.objects)} objects.")
-        
-        # Sort objects by name to match Geometry Nodes instance index order
-        sorted_objects = sorted(collection.objects, key=lambda o: o.name)
-        
-        for i, obj in enumerate(sorted_objects):
-            if obj.type == 'MESH':
-                # Calculate length along local Z (assuming flights are aligned along Z)
-                # We use the max dimension to be safe, as flights are usually long and thin.
-                length = max(obj.dimensions)
-                self.flight_lengths[i] = length
-                
-        print(f"[DartRandomizer] Cached lengths for {len(self.flight_lengths)} flights.")
 
     def setup_geometry_references(self, dart: Dart) -> None:
         """
@@ -131,13 +87,13 @@ class DartRandomizer(BaseRandomizer):
 
         self._randomize_generators(dart)
         
+        self._update_dart_size(dart)
+        
         # Pass dart to material randomizers
         self._randomize_flight_material(dart)
         self._randomize_shaft_material(dart)
         self._randomize_barrel_material(dart)
         self._randomize_tip_material(dart)
-        
-        self._update_dart_size(dart)
 
     def _get_material_from_generator(self, generator_obj: bpy.types.Object, material_prefix: str) -> Optional[bpy.types.Material]:
         """Helper to find a material on a generator object or its children."""
@@ -487,36 +443,13 @@ class DartRandomizer(BaseRandomizer):
 
     def _update_dart_size(self, dart: Dart) -> None:
         """
-        Calculate the total length of the dart analytically and update the root Empty's display size.
-        This is much faster than iterating the dependency graph.
+        Read the total length from the Flight generator's output attribute
+        and update the root Empty's display size.
         """
-        if not dart or not dart.root:
+        if not dart or not dart.root or not dart.flight:
             return
 
-        # Calculate total length from cached parameters (in mm)
-        # Total Length ~= Tip + Barrel + Shaft + Flight_Protrusion
-        
-        # Determine Flight Length
-        flight_length_mm = 44.0 # Default fallback
-        
-        # Try to get exact length from cache
-        if dart.flight_index in self.flight_lengths:
-            # Cached length is in meters (from obj.dimensions)
-            flight_length_mm = self.flight_lengths[dart.flight_index] * 1000.0
-        
-        flight_part = max(0.0, flight_length_mm - dart.flight_insertion_depth)
-        
-        total_length_mm = dart.tip_length + dart.barrel_length + dart.shaft_length + flight_part
-        
-        # Convert to meters for Blender size
-        total_length_m = total_length_mm / 1000.0
-        
-        # Adjust for object scale
-        # If the root object is scaled (e.g. 0.001 to convert mm to m), 
-        # the empty_display_size is also scaled. We need to compensate.
-        # We use the Z scale as the dart is aligned along Z.
-        scale_z = abs(dart.root.scale[2])
-        if scale_z > 1e-6: # Avoid division by zero
-            dart.root.empty_display_size = total_length_m / scale_z
-        else:
-            dart.root.empty_display_size = total_length_m
+        flight_insertion_depth_m = dart.flight_insertion_depth / 1000.0
+
+        length_m = dart.tip.dimensions[2] + dart.barrel.dimensions[2] + dart.shaft.dimensions[2] + dart.flight.dimensions[2] - flight_insertion_depth_m
+        dart.root.empty_display_size = length_m
