@@ -7,6 +7,7 @@ from randomizers.base_randomizer import BaseRandomizer
 from .throw_config import ThrowRandomConfig
 from randomizers.dart.dart_randomizer import DartRandomizer
 from randomizers.dart.dart import Dart
+from utils.dartboard_layout import DartboardLayout
 
 class ThrowRandomizer(BaseRandomizer):
     """
@@ -27,6 +28,9 @@ class ThrowRandomizer(BaseRandomizer):
         self.collection_name = "Generated_Darts"
         self.collection = None
         
+        # Initialize Dartboard Layout
+        self.board_layout = DartboardLayout()
+
         # Call super init which calls _initialize
         super().__init__(seed, config or ThrowRandomConfig())
 
@@ -242,10 +246,19 @@ class ThrowRandomizer(BaseRandomizer):
 
     def _randomize_transform(self, obj: bpy.types.Object) -> None:
         """Apply random position and rotation."""
-        # Position
-        x = self.config.pos_x_min + self.rng.random() * (self.config.pos_x_max - self.config.pos_x_min)
-        y = self.config.pos_y_min + self.rng.random() * (self.config.pos_y_max - self.config.pos_y_min)
-        z = self.config.pos_z_fixed # Assuming board plane
+        # Position (Polar Coordinates)
+        angle = self.rng.random() * 2 * math.pi
+        radius = self.rng.random() * self.config.max_radius
+        
+        # Validate radius using DartboardLayout
+        radius = self.board_layout.validate_radius(radius)
+        
+        # Validate angle using DartboardLayout
+        angle = self.board_layout.validate_angle(radius, angle)
+        
+        x = radius * math.cos(angle)
+        y = radius * math.sin(angle)
+        z = 0 # Assuming board plane is at Z=0
         
         obj.location = Vector((x, y, z))
         
