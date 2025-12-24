@@ -95,5 +95,8 @@ for h in handlers_to_remove:
 bpy.app.handlers.frame_change_pre.append(on_frame_change)
 print(f"Frame Change Handler registered (Count: {len(bpy.app.handlers.frame_change_pre)})")
 
+# Initial randomization for the first frame
+on_frame_change(bpy.context.scene)
+
 
 	
