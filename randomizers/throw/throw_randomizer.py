@@ -77,6 +77,10 @@ class ThrowRandomizer(BaseRandomizer):
         if not template_dart:
             print(f"[ThrowRandomizer] Template dart '{self.template_dart_name}' not found!")
             return
+        
+        # Debug: Check constraints
+        if template_dart.constraints:
+            print(f"[ThrowRandomizer] Template Dart '{template_dart.name}' has constraints: {[c.name for c in template_dart.constraints]}")
             
         template_k = bpy.data.objects.get(self.template_k_name)
         if not template_k:
@@ -89,6 +93,9 @@ class ThrowRandomizer(BaseRandomizer):
             # 1. Spawn Dart
             new_dart_root = self._duplicate_hierarchy(template_dart, linked=use_linked)
             if new_dart_root:
+                # Clear constraints on the root to allow free movement (e.g. if template was constrained to center)
+                new_dart_root.constraints.clear()
+
                 # Create Dart wrapper
                 dart_instance = Dart(new_dart_root)
                 self.spawned_darts.append(dart_instance)
@@ -164,8 +171,11 @@ class ThrowRandomizer(BaseRandomizer):
             if dart.k_point:
                 k_point = dart.k_point
                 # 1. Move K-Point to Dart's surface position
-                k_point.location = dart.root.location
-                k_point.rotation_euler = dart.root.rotation_euler
+                # IMPORTANT: We must copy the vector, otherwise it's a reference!
+                # But assigning vector to vector property in Blender usually copies values.
+                # Let's be explicit to be safe.
+                k_point.location = dart.root.location.copy()
+                k_point.rotation_euler = dart.root.rotation_euler.copy()
                 
                 # 2. Calculate Embedding Depth
                 # Get tip length from the dart instance (cached!)
@@ -260,8 +270,14 @@ class ThrowRandomizer(BaseRandomizer):
         y = radius * math.sin(angle)
         z = 0 # Assuming board plane is at Z=0
         
+        print(f"[ThrowRandomizer] {obj.name}: Radius={radius:.4f}, Angle={angle:.4f} -> ({x:.4f}, {y:.4f}, {z:.4f})")
+        
         obj.location = Vector((x, y, z))
         
+        # Debug: Check if location assignment worked (constraints might override it)
+        if (obj.location - Vector((x, y, z))).length > 0.001:
+             print(f"[ThrowRandomizer] Warning: Location assignment failed for {obj.name}! Wanted {Vector((x,y,z))}, got {obj.location}. Check for constraints.")
+
         # Rotation
         rx = math.radians(self.config.rot_x_min + self.rng.random() * (self.config.rot_x_max - self.config.rot_x_min))
         ry = math.radians(self.config.rot_y_min + self.rng.random() * (self.config.rot_y_max - self.config.rot_y_min))
