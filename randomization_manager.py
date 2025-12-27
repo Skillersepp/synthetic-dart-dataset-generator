@@ -7,6 +7,7 @@ from randomizers.scene import SceneRandomizer, SceneRandomConfig
 from randomizers.dartboard import DartboardRandomizer, DartboardRandomConfig, RangeOrFixed
 from randomizers.dart import DartRandomizer, DartRandomConfig
 from randomizers.throw import ThrowRandomizer, ThrowRandomConfig
+from randomizers.annotation_manager import AnnotationManager
 
 
 class RandomizationManager:
@@ -66,6 +67,9 @@ class RandomizationManager:
             config=throw_cfg,
             dart_randomizer=self.dart_randomizer
         )
+
+        # Annotation Manager
+        self.annotation_manager = AnnotationManager(self.throw_randomizer)
 
     def _make_seed(self, tag: str, index: int) -> int:
         """Deterministic sub-seed generation."""
