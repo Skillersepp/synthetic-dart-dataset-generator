@@ -29,6 +29,27 @@ class Dart:
         self.shaft_length: float = 0.0
         self.flight_insertion_depth: float = 0.0
         self.flight_index: int = 0
+        self.is_visible: bool = True
+
+    def set_visibility(self, visible: bool) -> None:
+        """
+        Sets the visibility (viewport and render) for the entire dart hierarchy.
+        """
+        self.is_visible = visible
+        
+        # Helper to set visibility for an object and its children recursively
+        def _set_obj_visibility(obj: bpy.types.Object, state: bool):
+            obj.hide_viewport = not state
+            obj.hide_render = not state
+            for child in obj.children:
+                _set_obj_visibility(child, state)
+
+        if self.root:
+            _set_obj_visibility(self.root, visible)
+            
+        if self.k_point:
+            self.k_point.hide_viewport = not visible
+            self.k_point.hide_render = not visible
         
     def _find_child(self, parent: bpy.types.Object, name_part: str) -> Optional[bpy.types.Object]:
         """Recursive search for a child object by name pattern."""

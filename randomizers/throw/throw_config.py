@@ -24,3 +24,7 @@ class ThrowRandomConfig:
     # Embedding depth (factor of tip length)
     embed_depth_factor_min: float = 0.1
     embed_depth_factor_max: float = 0.8
+
+    # Visibility / Bouncer settings
+    allow_darts_outside_board: bool = False # If False, darts with radius > 0.225m are hidden
+    bouncer_probability: float = 0.0 # Probability (0.0 to 1.0) that a dart is hidden (simulating a bouncer)
