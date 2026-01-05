@@ -69,7 +69,7 @@ class RandomizationManager:
         )
 
         # Annotation Manager
-        self.annotation_manager = AnnotationManager(self.throw_randomizer)
+        self.annotation_manager = AnnotationManager(self.throw_randomizer, self.base_path)
 
     def _make_seed(self, tag: str, index: int) -> int:
         """Deterministic sub-seed generation."""

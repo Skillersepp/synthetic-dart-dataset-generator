@@ -153,6 +153,9 @@ class ThrowRandomizer(BaseRandomizer):
         for i, dart in enumerate(self.spawned_darts):
             if not dart or not dart.root: continue
             
+            # Reset visibility (in case it was hidden in previous frame)
+            dart.set_visibility(True)
+            
             # Randomize Appearance
             if self.dart_randomizer:
                 # Determine seed for this dart
@@ -166,6 +169,26 @@ class ThrowRandomizer(BaseRandomizer):
             
             # Randomize Position/Rotation
             self._randomize_transform(dart.root)
+            
+            # --- Visibility Logic ---
+            # Calculate radius from current location (assuming board center is 0,0,0)
+            current_radius = dart.root.location.xy.length
+            
+            should_hide = False
+            
+            # Rule 1: Outside board
+            if current_radius > 0.225 and not self.config.allow_darts_outside_board:
+                should_hide = True
+                # print(f"[ThrowRandomizer] Hiding {dart.root.name}: Radius {current_radius:.4f} > 0.225m")
+                
+            # Rule 2: Bouncer (only if not already hidden)
+            if not should_hide and self.config.bouncer_probability > 0:
+                if self.rng.random() < self.config.bouncer_probability:
+                    should_hide = True
+                    # print(f"[ThrowRandomizer] Hiding {dart.root.name}: Bouncer (Prob: {self.config.bouncer_probability})")
+                    
+            if should_hide:
+                dart.set_visibility(False)
             
             # Handle K-Point and Embedding
             if dart.k_point:
