@@ -51,15 +51,17 @@ class SceneRandomizer(BaseRandomizer):
         
         print(f"Loading {len(hdri_files)} HDRIs from {hdri_path}...")
         
-        # First, clear existing HDRIs to ensure fresh reload
-        for hdri_file in hdri_files:
-            if hdri_file.name in bpy.data.images:
-                bpy.data.images.remove(bpy.data.images[hdri_file.name])
-
+        # Load/Link HDRIs safely
         for hdri_file in hdri_files:
             try:
-                # Load new image
-                img = bpy.data.images.load(str(hdri_file), check_existing=True)
+                # Check if image already exists
+                if hdri_file.name in bpy.data.images:
+                    img = bpy.data.images[hdri_file.name]
+                    img.reload()
+                else:
+                    # Load new image
+                    img = bpy.data.images.load(str(hdri_file), check_existing=True)
+                
                 print(f"  - Loaded: {hdri_file.name}")
                 
                 # Ensure image persists in memory
@@ -167,6 +169,18 @@ class SceneRandomizer(BaseRandomizer):
         hdri_key = self.rng.choice(list(self.hdri_images.keys()))
         new_image = self.hdri_images[hdri_key]
         
+        # Verify image is valid
+        try:
+             _ = new_image.name
+        except ReferenceError:
+             # Image is dead, try to recover it from bpy.data.images or skip
+             if hdri_key in bpy.data.images:
+                 new_image = bpy.data.images[hdri_key]
+                 self.hdri_images[hdri_key] = new_image # Update cache
+             else:
+                 print(f"HDRI {hdri_key} missing or invalid. Skipping.")
+                 return
+
         # Optimization: Only assign if different to avoid unnecessary updates/crashes
         if env_tex.image != new_image:
             env_tex.image = new_image
