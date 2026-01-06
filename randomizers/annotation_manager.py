@@ -2,6 +2,7 @@ import bpy
 import bpy_extras
 import json
 import os
+import numpy as np
 from mathutils import Vector
 from typing import List, Dict, Any, Tuple
 from pathlib import Path
@@ -21,7 +22,6 @@ class AnnotationManager:
         Returns (x, y, z) where z is depth.
         """
         co_2d = bpy_extras.object_utils.world_to_camera_view(scene, camera, world_coord)
-        
         # Blender: (0,0) is Bottom-Left
         # Image: (0,0) is Top-Left
         # x is same, y needs flip
@@ -33,39 +33,115 @@ class AnnotationManager:
 
     def get_bbox_from_object(self, scene: bpy.types.Scene, camera: bpy.types.Object, obj: bpy.types.Object) -> Dict[str, float]:
         """
-        Calculates the 2D bounding box (normalized) for an object and its children.
+        Calculates the 2D bounding box (normalized) for an object and its children based on mesh vertices.
         Returns dictionary with min/max coordinates.
+        Using direct numpy calculation for performance and accuracy.
         """
-        min_x, max_x = 1.0, 0.0
-        min_y, max_y = 1.0, 0.0
-        found_points = False
+        depsgraph = bpy.context.evaluated_depsgraph_get()
 
-        def process_obj(o):
-            nonlocal min_x, max_x, min_y, max_y, found_points
-            if o.type == 'MESH' and o.bound_box:
-                # Get the 8 corners of the bounding box in world space
-                bbox_corners = [o.matrix_world @ Vector(corner) for corner in o.bound_box]
-                
-                for corner in bbox_corners:
-                    coords = self.get_normalized_coords(scene, camera, corner)
-                    
-                    # Clamp to [0, 1] for bbox calculation
-                    cx = max(0.0, min(1.0, coords.x))
-                    cy = max(0.0, min(1.0, coords.y))
-                    
-                    min_x = min(min_x, cx)
-                    max_x = max(max_x, cx)
-                    min_y = min(min_y, cy)
-                    max_y = max(max_y, cy)
-                    found_points = True
+        # Camera matrices
+        render = scene.render
+        w = int(render.resolution_x * render.resolution_percentage / 100.0)
+        h = int(render.resolution_y * render.resolution_percentage / 100.0)
+
+        cam_eval = camera.evaluated_get(depsgraph)
+        cam_data = cam_eval.data
+
+        # Projection matrix (camera -> clip space)
+        scale_x = render.pixel_aspect_x
+        scale_y = render.pixel_aspect_y
+        proj = cam_eval.calc_matrix_camera(
+            depsgraph,
+            x=w, y=h,
+            scale_x=scale_x, scale_y=scale_y
+        )
+
+        # World -> camera
+        view = cam_eval.matrix_world.inverted()
+
+        # Collect all mesh objects in hierarchy (root + children)
+        # (children_recursive gives access to all descendants)
+        objs = [obj] + list(obj.children_recursive)
+
+        all_min = np.array([np.inf, np.inf], dtype=np.float64)
+        all_max = np.array([-np.inf, -np.inf], dtype=np.float64)
+        found = False
+
+        for current_obj in objs:
+            if current_obj.type != 'MESH':
+                continue
             
-            for child in o.children:
-                process_obj(child)
+            # Hide render checks? 
+            # If the object is hidden in render, we should arguably skip it.
+            if current_obj.hide_render:
+                continue
 
-        process_obj(obj)
+            obj_eval = current_obj.evaluated_get(depsgraph)
 
-        if not found_points:
+            # Get evaluated mesh (modifiers applied etc.)
+            mesh = obj_eval.to_mesh(preserve_all_data_layers=False, depsgraph=depsgraph)
+            if not mesh or len(mesh.vertices) == 0:
+                if mesh:
+                    obj_eval.to_mesh_clear()
+                continue
+
+            # Pull vertex coords fast
+            co = np.empty(len(mesh.vertices) * 3, dtype=np.float64)
+            mesh.vertices.foreach_get("co", co)
+            co = co.reshape((-1, 3))
+
+            # Homogeneous coords
+            ones = np.ones((co.shape[0], 1), dtype=np.float64)
+            co_h = np.concatenate([co, ones], axis=1)
+
+            # Local -> world
+            mw = np.array(obj_eval.matrix_world, dtype=np.float64)
+            world = (mw @ co_h.T).T
+
+            # World -> camera
+            view_m = np.array(view, dtype=np.float64)
+            cam_space = (view_m @ world.T).T
+
+            # Camera -> clip
+            proj_m = np.array(proj, dtype=np.float64)
+            clip = (proj_m @ cam_space.T).T
+
+            # Perspective divide -> NDC
+            w_comp = clip[:, 3]
+            # Check for vertices in front of camera
+            in_front = w_comp > 1e-8
+            if not np.any(in_front):
+                obj_eval.to_mesh_clear()
+                continue
+
+            ndc = clip[in_front, :3] / w_comp[in_front, None]
+
+            # NDC (-1..1) -> normalized screen (0..1)
+            # Standard NDC: x right, y up.
+            x = (ndc[:, 0] + 1.0) * 0.5
+            y = (ndc[:, 1] + 1.0) * 0.5
+            
+            # Flip y so (0, 0) is top-left in the image.
+            y = 1.0 - y
+
+            # Clamp to [0, 1]
+            x = np.clip(x, 0.0, 1.0)
+            y = np.clip(y, 0.0, 1.0)
+
+            mn = np.array([x.min(), y.min()])
+            mx = np.array([x.max(), y.max()])
+
+            all_min = np.minimum(all_min, mn)
+            all_max = np.maximum(all_max, mx)
+            found = True
+
+            obj_eval.to_mesh_clear()
+
+        if not found:
             return None
+
+        min_x, min_y = float(all_min[0]), float(all_min[1])
+        max_x, max_y = float(all_max[0]), float(all_max[1])
 
         return {
             "min_x": min_x,
@@ -82,6 +158,9 @@ class AnnotationManager:
         """
         Generates a JSON annotation file for the current frame.
         """
+        # Ensure scene is updated
+        bpy.context.view_layer.update()
+
         frame_idx = scene.frame_current
         filename = f"{frame_idx:04d}.json"
         filepath = self.output_dir / filename

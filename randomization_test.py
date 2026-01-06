@@ -19,9 +19,7 @@ PROJECT_MODULES = [
 	"utils.camera_utils",
 	"utils.node_utils",
 	"utils.color_utils",
-	"utils.material_utils",
 	"utils.dartboard_layout",
-	"randomizers.base_config",
 	"randomizers.base_randomizer",
 	"randomizers.camera.camera_config",
 	"randomizers.camera.camera_randomizer",
@@ -86,47 +84,37 @@ def on_frame_change_pre(scene):
 		print(f"Error in frame_change_pre: {e}")
 
 @persistent
-def on_frame_change_post(scene):
+def on_render_post(scene):
 	"""
-	Called AFTER the frame changed.
-	Use this to read the calculated positions (Annotation).
+	Called AFTER the frame is rendered.
+	Use this to read the calculated positions (Annotation) to ensure sync with render.
 	"""
+	
 	if not scene or not scene.camera:
 		return
-	
 	try:
-		# Note: In frame_change_post, the dependency graph should be updated for the current frame.
-		# So we can read the positions directly.
 		manager.annotation_manager.annotate(scene, scene.camera)
 	except Exception as e:
-		print(f"Error in frame_change_post: {e}")
+		print(f"Error in render_post: {e}")
 
 # Register event handlers
 # Clear old handlers
-handlers_to_remove = [h for h in bpy.app.handlers.frame_change_pre if h.__name__ == "on_frame_change_pre" or h.__name__ == "on_frame_change"]
-for h in handlers_to_remove:
+for h in [h for h in bpy.app.handlers.frame_change_pre if h.__name__ in ("on_frame_change_pre", "on_frame_change")]:
     bpy.app.handlers.frame_change_pre.remove(h)
 
-handlers_to_remove_post = [h for h in bpy.app.handlers.frame_change_post if h.__name__ == "on_frame_change_post"]
-for h in handlers_to_remove_post:
-    bpy.app.handlers.frame_change_post.remove(h)
-
-# Remove render_pre as it is not suitable for per-frame annotation in animations
-render_handlers_to_remove = [h for h in bpy.app.handlers.render_pre if h.__name__ == "on_render_pre"]
-for h in render_handlers_to_remove:
-	bpy.app.handlers.render_pre.remove(h)
+for h in [h for h in bpy.app.handlers.render_post if h.__name__ == "on_render_post"]:
+    bpy.app.handlers.render_post.remove(h)
 
 # Append new handlers
 bpy.app.handlers.frame_change_pre.append(on_frame_change_pre)
-bpy.app.handlers.frame_change_post.append(on_frame_change_post)
+bpy.app.handlers.render_post.append(on_render_post)
 
-print(f"Handlers registered: Pre ({len(bpy.app.handlers.frame_change_pre)}), Post ({len(bpy.app.handlers.frame_change_post)})")
+print(f"Handlers registered: Pre ({len(bpy.app.handlers.frame_change_pre)}), Render Post ({len(bpy.app.handlers.render_post)})")
 
 # Initial trigger
 on_frame_change_pre(bpy.context.scene)
-# Force update for the initial state so that post-handler sees correct positions
+# Force update for the initial state
 bpy.context.view_layer.update()
-on_frame_change_post(bpy.context.scene)
 
 
 	

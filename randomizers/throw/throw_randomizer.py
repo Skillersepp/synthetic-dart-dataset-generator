@@ -293,7 +293,8 @@ class ThrowRandomizer(BaseRandomizer):
         y = radius * math.sin(angle)
         z = 0 # Assuming board plane is at Z=0
         
-        print(f"[ThrowRandomizer] {obj.name}: Radius={radius:.4f}, Angle={angle:.4f} -> ({x:.4f}, {y:.4f}, {z:.4f})")
+        # Debug
+        # print(f"[ThrowRandomizer] {obj.name}: Radius={radius:.4f}, Angle={angle:.4f} -> ({x:.4f}, {y:.4f}, {z:.4f})")
         
         obj.location = Vector((x, y, z))
         
