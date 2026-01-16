@@ -21,7 +21,15 @@ class DartRandomConfig:
     """
     Configuration for dart geometry randomization.
     """
+    # -----------------------------------------------------------------
+    # Asset paths (relative to project root)
+    # -----------------------------------------------------------------
+    flight_textures_flags_folder: str = "assets/textures/dart/flight/flags"
+    flight_textures_outpainted_folder: str = "assets/textures/dart/flight/outpainted"
+    
+    # -----------------------------------------------------------------
     # Tip Generator
+    # -----------------------------------------------------------------
     tip_length: RangeOrFixed = field(default_factory=lambda: RangeOrFixed(20.0, 45.0))
     
     # Barrel Generator
