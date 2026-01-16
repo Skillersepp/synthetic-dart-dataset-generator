@@ -14,6 +14,9 @@ renders/
 output/
 dataset/
 
+# Assets
+assets/
+
 # OS
 .DS_Store
 Thumbs.db
