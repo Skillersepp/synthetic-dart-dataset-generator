@@ -24,7 +24,7 @@ class CameraRandomConfig:
 
     # Spherical angles (camera on a spherical shell)
     polar_angle_min: float = 0.0
-    polar_angle_max: float = 75.0
+    polar_angle_max: float = 45.0
     azimuth_min: float = 0.0
     azimuth_max: float = 360.0
 
@@ -40,5 +40,5 @@ class CameraRandomConfig:
     # DOF
     board_diameter_m: float = 0.44
     focus_radius_max_m: float = 0.225
-    aperture_fstop_min: float = 0.8
-    aperture_fstop_max: float = 5.6
+    aperture_fstop_min: float = 2.8
+    aperture_fstop_max: float = 8.0

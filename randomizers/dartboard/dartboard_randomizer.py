@@ -1,10 +1,12 @@
 import bpy
-from typing import Optional, Tuple
+from pathlib import Path
+from typing import Optional, Tuple, List
 
 from randomizers.base_randomizer import BaseRandomizer
 from .dartboard_config import DartboardRandomConfig, ColorVariation
 from utils.node_utils import find_node_group, set_node_input, set_geometry_node_input
 from utils.color_utils import randomize_color_hsv
+from utils.asset_utils import get_texture_paths, load_single_image
 
 
 class DartboardRandomizer(BaseRandomizer):
@@ -25,6 +27,13 @@ class DartboardRandomizer(BaseRandomizer):
             config: Configuration for randomization
         """
         super().__init__(seed, config or DartboardRandomConfig())
+        
+        # Texture paths for outer ring (loaded on demand)
+        self._outer_ring_texture_paths: List[Path] = []
+        
+        # Cached node references (set during _initialize)
+        self._outer_ring_image_node: Optional[bpy.types.ShaderNodeTexImage] = None
+        self._outer_ring_group_node: Optional[bpy.types.ShaderNodeGroup] = None
 
     # -------------------------------------------------------------------------
     # INITIALIZATION (BaseRandomizer Interface)
@@ -34,11 +43,19 @@ class DartboardRandomizer(BaseRandomizer):
         """
         Initialization at startup.
         
-        Geometry Nodes modifiers could be cached here later.
-        Currently no heavy initialization needed.
+        Scans outer ring texture paths and validates materials.
         """
         # Validate that required materials exist
         self._validate_materials()
+        
+        # Scan outer ring texture paths (fast, doesn't load images)
+        self._outer_ring_texture_paths = get_texture_paths(
+            self.config.outer_ring_textures_folder
+        )
+        print(f"[DartboardRandomizer] Found {len(self._outer_ring_texture_paths)} outer ring texture paths")
+        
+        # Cache outer ring material nodes
+        self._cache_outer_ring_nodes()
 
     def _validate_materials(self) -> None:
         """Check if configured materials exist."""
@@ -48,7 +65,30 @@ class DartboardRandomizer(BaseRandomizer):
                 missing.append(f"{key}: {mat_name}")
         
         if missing:
-            print(f"[DartboardRandomizer] Warning - Materials not found: {missing}")
+            print(f"[DartboardRandomizer] Warning: Materials not found: {missing}")
+
+    def _cache_outer_ring_nodes(self) -> None:
+        """Cache node references for outer ring material to avoid repeated lookups."""
+        mat_name = self.config.material_names.get("outer_ring")
+        if not mat_name or mat_name not in bpy.data.materials:
+            return
+        
+        material = bpy.data.materials[mat_name]
+        if not material.use_nodes:
+            return
+        
+        node_tree = material.node_tree
+        
+        # Find and cache the Image Texture node
+        for node in node_tree.nodes:
+            if node.type == 'TEX_IMAGE':
+                self._outer_ring_image_node = node
+                break
+        
+        # Find and cache the group_black_score_texture node
+        self._outer_ring_group_node = find_node_group(
+            node_tree, self.config.node_group_names["score_black"]
+        )
 
     # -------------------------------------------------------------------------
     # PUBLIC API (BaseRandomizer Interface)
@@ -61,9 +101,23 @@ class DartboardRandomizer(BaseRandomizer):
         Randomizes:
         - All score texture materials
         - Number ring material
+        - Outer ring texture material
         """
-        # Randomize score materials
-        self._randomize_score_materials()
+        # Ensure outer ring is initialized (lazy loading for module reloads)
+        if not self._outer_ring_texture_paths or not self._outer_ring_image_node:
+            self._initialize_outer_ring()
+        
+        # Generate shared values for score materials and outer ring
+        shared_seed = self.rng.randint(0, 10000)
+        shared_crack_factor = self.config.crack_factor.get_value(self.rng) if self.config.randomize_cracks else None
+        shared_hole_factor = self.config.hole_factor.get_value(self.rng) if self.config.randomize_holes else None
+        shared_black_color = self._get_randomized_color(self.config.field_color_black)
+        
+        # Randomize score materials with shared values
+        self._randomize_score_materials(shared_seed, shared_crack_factor, shared_hole_factor, shared_black_color)
+        
+        # Randomize outer ring material with same shared values
+        self._randomize_outer_ring_material(shared_seed, shared_crack_factor, shared_hole_factor, shared_black_color)
         
         # Randomize number ring material
         self._randomize_number_ring_material()
@@ -71,23 +125,44 @@ class DartboardRandomizer(BaseRandomizer):
         # Randomize Geometry Nodes (wire seeds)
         self._randomize_geometry_nodes()
 
+    def _initialize_outer_ring(self) -> None:
+        """Initialize outer ring texture paths and cache nodes. Can be called multiple times safely."""
+        # Scan texture paths if not done yet
+        if not self._outer_ring_texture_paths:
+            self._outer_ring_texture_paths = get_texture_paths(
+                self.config.outer_ring_textures_folder
+            )
+        
+        # Cache nodes if not cached
+        if not self._outer_ring_image_node:
+            self._cache_outer_ring_nodes()
+
     # -------------------------------------------------------------------------
     # SCORE MATERIALS
     # -------------------------------------------------------------------------
 
-    def _randomize_score_materials(self) -> None:
-        """Randomize all score texture materials."""
+    def _randomize_score_materials(
+        self,
+        shared_seed: int,
+        shared_crack_factor: Optional[float],
+        shared_hole_factor: Optional[float],
+        shared_black_color: Tuple[float, float, float, float]
+    ) -> None:
+        """
+        Randomize all score texture materials.
+        
+        Args:
+            shared_seed: Shared seed for consistent textures across all score materials
+            shared_crack_factor: Shared crack factor value (None if not randomizing)
+            shared_hole_factor: Shared hole factor value (None if not randomizing)
+            shared_black_color: Pre-generated color for black fields (shared with outer ring)
+        """
         score_materials = [
             ("score_red", "field_color_red"),
             ("score_green", "field_color_green"),
             ("score_white", "field_color_white"),
-            ("score_black", "field_color_black"),
+            ("score_black", None),  # Uses shared_black_color
         ]
-        
-        # Generate shared values for all score materials so textures match across fields
-        shared_seed = self.rng.randint(0, 10000)
-        shared_crack_factor = self.config.crack_factor.get_value(self.rng) if self.config.randomize_cracks else None
-        shared_hole_factor = self.config.hole_factor.get_value(self.rng) if self.config.randomize_holes else None
         
         for mat_key, color_attr in score_materials:
             mat_name = self.config.material_names.get(mat_key)
@@ -95,16 +170,23 @@ class DartboardRandomizer(BaseRandomizer):
                 continue
             
             material = bpy.data.materials[mat_name]
-            color_config = getattr(self.config, color_attr)
+            
+            # For black, use the shared color; for others, generate from config
+            if color_attr is None:
+                color = shared_black_color
+            else:
+                color_config = getattr(self.config, color_attr)
+                color = self._get_randomized_color(color_config)
+            
             self._randomize_score_material(
-                material, color_config,
+                material, color,
                 shared_seed, shared_crack_factor, shared_hole_factor
             )
 
     def _randomize_score_material(
         self, 
-        material, 
-        color_config: ColorVariation,
+        material,
+        color: Tuple[float, float, float, float],
         seed: int,
         crack_factor: Optional[float],
         hole_factor: Optional[float]
@@ -114,7 +196,7 @@ class DartboardRandomizer(BaseRandomizer):
         
         Args:
             material: The material to randomize
-            color_config: Color configuration for this material
+            color: RGBA color tuple for the field
             seed: Shared seed for consistent textures across all score materials
             crack_factor: Shared crack factor value (None if not randomizing)
             hole_factor: Shared hole factor value (None if not randomizing)
@@ -141,9 +223,8 @@ class DartboardRandomizer(BaseRandomizer):
         # Hole Factor (shared across all materials)
         if hole_factor is not None:
             set_node_input(group_node, "Hole_factor", hole_factor)
-         
-        # Field Color - set with optional variation based on color_config.randomize
-        color = self._get_randomized_color(color_config)
+        
+        # Field Color
         set_node_input(group_node, "Field_color", color)
 
     # -------------------------------------------------------------------------
@@ -165,7 +246,6 @@ class DartboardRandomizer(BaseRandomizer):
         group_node = find_node_group(node_tree, group_name)
         
         if not group_node:
-            print(f"[DartboardRandomizer] Node Group '{group_name}' not found in {mat_name}")
             return
         
         # Set seed
@@ -182,6 +262,49 @@ class DartboardRandomizer(BaseRandomizer):
         # Digit Color - set with optional variation based on digit_color.randomize
         color = self._get_randomized_color(self.config.digit_color)
         set_node_input(group_node, "Digit_color", color)
+
+    # -------------------------------------------------------------------------
+    # OUTER RING MATERIAL
+    # -------------------------------------------------------------------------
+
+    def _randomize_outer_ring_material(
+        self,
+        shared_seed: int,
+        shared_crack_factor: Optional[float],
+        shared_hole_factor: Optional[float],
+        shared_black_color: Tuple[float, float, float, float]
+    ) -> None:
+        """
+        Randomize the outer ring texture material.
+        
+        Sets a random texture from the loaded textures and applies the same
+        group_black_score_texture parameters as the score materials.
+        Uses cached node references for better performance.
+        
+        Args:
+            shared_seed: Shared seed for consistent textures
+            shared_crack_factor: Shared crack factor value (None if not randomizing)
+            shared_hole_factor: Shared hole factor value (None if not randomizing)
+            shared_black_color: Field color matching black_score_texture_material
+        """
+        # Set random texture in cached Image Texture node
+        if self._outer_ring_texture_paths and self._outer_ring_image_node:
+            random_texture_path = self.rng.choice(self._outer_ring_texture_paths)
+            # Load only this one image (fast, uses cache if already loaded)
+            texture = load_single_image(random_texture_path, use_fake_user=False)
+            if texture:
+                self._outer_ring_image_node.image = texture
+        
+        # Apply values to cached group_black_score_texture node
+        if self._outer_ring_group_node:
+            set_node_input(self._outer_ring_group_node, "Seed", shared_seed)
+            set_node_input(self._outer_ring_group_node, "Field_color", shared_black_color)
+            
+            if shared_crack_factor is not None:
+                set_node_input(self._outer_ring_group_node, "Crack_factor", shared_crack_factor)
+            
+            if shared_hole_factor is not None:
+                set_node_input(self._outer_ring_group_node, "Hole_factor", shared_hole_factor)
 
     # -------------------------------------------------------------------------
     # GEOMETRY NODES
@@ -201,20 +324,10 @@ class DartboardRandomizer(BaseRandomizer):
         for obj_name, modifier_name in self.config.geometry_node_modifiers.items():
             obj = bpy.data.objects.get(obj_name)
             if not obj:
-                print(f"[DartboardRandomizer] Object '{obj_name}' not found")
                 continue
             
-            success = set_geometry_node_input(obj, modifier_name, "Seed", wire_seed)
-            if not success:
-                print(f"[DartboardRandomizer] Could not set Seed on '{modifier_name}' in '{obj_name}'")
-            else:
-                # Force update of the object to ensure Geometry Nodes re-evaluate
+            if set_geometry_node_input(obj, modifier_name, "Seed", wire_seed):
                 obj.update_tag()
-        
-        # Force dependency graph update to ensure geometry is recalculated
-        # This is sometimes needed for Geometry Nodes to reflect changes immediately
-        #if bpy.context.view_layer:
-        #    bpy.context.view_layer.update()
 
     # -------------------------------------------------------------------------
     # HELPER METHODS

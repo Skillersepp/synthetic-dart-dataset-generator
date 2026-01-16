@@ -22,10 +22,7 @@ from .asset_utils import (
     set_base_path,
     get_base_path,
     resolve_asset_path,
-    repair_image_path,
     repair_all_image_paths,
-    load_images_from_folder,
+    get_texture_paths,
     load_single_image,
-    load_hdris,
-    load_textures,
 )
