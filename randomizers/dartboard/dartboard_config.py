@@ -117,6 +117,11 @@ class DartboardRandomConfig:
     ))
     
     # -------------------------------------------------------------------------
+    # Asset paths (relative to project root)
+    # -------------------------------------------------------------------------
+    outer_ring_textures_folder: str = "assets/textures/dartboard/ring"
+    
+    # -------------------------------------------------------------------------
     # Material name mapping (for easy adjustment when names change)
     # -------------------------------------------------------------------------
     material_names: dict = field(default_factory=lambda: {
@@ -125,6 +130,7 @@ class DartboardRandomConfig:
         "score_white": "white_score_texture_material",
         "score_black": "black_score_texture_material",
         "number_ring": "number_ring",
+        "outer_ring": "outer_ring_texture_material",
     })
     
     # -------------------------------------------------------------------------

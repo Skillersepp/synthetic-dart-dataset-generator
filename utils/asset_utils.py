@@ -4,11 +4,16 @@ Utility functions for loading and managing assets (images, textures, HDRIs) in B
 This module provides a unified interface for loading assets from the assets folder.
 All asset paths should be defined in the respective config files and loaded using
 these utility functions to ensure consistent behavior across all randomizers.
+
+Lazy Loading Pattern:
+- Use get_texture_paths() to scan folder paths at startup (fast)
+- Use load_single_image() to load individual images on-demand during randomize()
+- This avoids loading thousands of images at startup
 """
 
 import bpy
 from pathlib import Path
-from typing import List, Dict, Optional, Set
+from typing import List, Optional, Set
 
 
 # Module-level base path, set during initialization
@@ -56,44 +61,6 @@ def resolve_asset_path(relative_path: str | Path) -> Path:
     """
     base = get_base_path()
     return base / relative_path
-
-
-def repair_image_path(image: bpy.types.Image, expected_folder: Path) -> bool:
-    """
-    Repair an image's filepath if it points to a non-existent location.
-    
-    This is useful when switching between different machines (e.g., Windows/Linux)
-    where absolute paths in the .blend file become invalid.
-    
-    Args:
-        image: The Blender image datablock to repair
-        expected_folder: The folder where the image should be located
-        
-    Returns:
-        True if path was repaired, False if no repair was needed or possible
-    """
-    current_path = Path(bpy.path.abspath(image.filepath))
-    
-    # If current path exists, no repair needed
-    if current_path.exists():
-        return False
-    
-    # Try to find the file in the expected folder
-    expected_path = expected_folder / image.name
-    if expected_path.exists():
-        image.filepath = str(expected_path)
-        image.reload()
-        return True
-    
-    # Try case-insensitive search
-    if expected_folder.exists():
-        for file in expected_folder.iterdir():
-            if file.name.lower() == image.name.lower():
-                image.filepath = str(file)
-                image.reload()
-                return True
-    
-    return False
 
 
 def repair_all_image_paths() -> int:
@@ -148,26 +115,26 @@ def repair_all_image_paths() -> int:
     return repaired
 
 
-def load_images_from_folder(
+def get_texture_paths(
     folder_path: str | Path,
-    extensions: Optional[List[str]] = None,
-    force_reload: bool = False,
-    use_fake_user: bool = True
-) -> List[bpy.types.Image]:
+    extensions: Optional[List[str]] = None
+) -> List[Path]:
     """
-    Load all images from a folder into Blender's data.
+    Get all texture file paths from a folder WITHOUT loading them into Blender.
+    
+    This is the preferred method for discovering assets. It's very fast because
+    it only scans the filesystem. Use load_single_image() to load individual 
+    images on-demand during randomize() calls.
     
     Args:
-        folder_path: Relative path to the folder (e.g. "assets/textures/dart/flight/flags")
-        extensions: List of file extensions to load (default: common image formats)
-        force_reload: If True, reload existing images from disk
-        use_fake_user: If True, set fake user on loaded images to prevent garbage collection
+        folder_path: Relative path to texture folder (e.g. "assets/textures/dart/flight")
+        extensions: List of file extensions to include (default: common image formats)
         
     Returns:
-        List of loaded Blender Image datablocks
+        Sorted list of absolute Path objects to texture files
     """
     if extensions is None:
-        extensions = ['.png', '.jpg', '.jpeg', '.tif', '.tiff', '.bmp', '.exr', '.hdr']
+        extensions = ['.png', '.jpg', '.jpeg', '.tif', '.tiff', '.exr', '.hdr']
     
     # Normalize extensions to lowercase
     extensions = [ext.lower() if ext.startswith('.') else f'.{ext.lower()}' for ext in extensions]
@@ -175,12 +142,7 @@ def load_images_from_folder(
     # Resolve path
     abs_path = resolve_asset_path(folder_path)
     
-    if not abs_path.exists():
-        print(f"[AssetUtils] Warning: Folder not found: {abs_path}")
-        return []
-    
-    if not abs_path.is_dir():
-        print(f"[AssetUtils] Warning: Path is not a directory: {abs_path}")
+    if not abs_path.exists() or not abs_path.is_dir():
         return []
     
     # Find all image files
@@ -196,24 +158,8 @@ def load_images_from_folder(
         if f.name.lower() not in seen:
             seen.add(f.name.lower())
             unique_files.append(f)
-    image_files = unique_files
     
-    if not image_files:
-        print(f"[AssetUtils] Warning: No image files found in {abs_path}")
-        return []
-    
-    # Load images
-    loaded_images = []
-    for img_file in sorted(image_files):
-        try:
-            img = load_single_image(img_file, force_reload=force_reload, use_fake_user=use_fake_user)
-            if img:
-                loaded_images.append(img)
-        except Exception as e:
-            print(f"[AssetUtils] Failed to load {img_file.name}: {e}")
-    
-    print(f"[AssetUtils] Loaded {len(loaded_images)} images from {folder_path}")
-    return loaded_images
+    return sorted(unique_files)
 
 
 def load_single_image(
@@ -223,6 +169,10 @@ def load_single_image(
 ) -> Optional[bpy.types.Image]:
     """
     Load a single image into Blender's data.
+    
+    This is the preferred method for loading images. Call this on-demand during
+    randomize() with a path from get_texture_paths(). Images are cached by Blender,
+    so repeated loads of the same file are fast.
     
     Automatically repairs broken paths when switching between different machines
     (e.g., Windows/Linux) where absolute paths in the .blend file become invalid.
@@ -271,52 +221,4 @@ def load_single_image(
     except Exception as e:
         print(f"[AssetUtils] Error loading {file_path}: {e}")
         return None
-
-
-def load_hdris(
-    folder_path: str | Path,
-    force_reload: bool = False
-) -> Dict[str, bpy.types.Image]:
-    """
-    Load all HDRI files from a folder.
-    
-    Args:
-        folder_path: Relative path to HDRI folder (e.g. "assets/HDRIs")
-        force_reload: If True, reload from disk
-        
-    Returns:
-        Dictionary mapping filename to Image datablock
-    """
-    extensions = ['.exr', '.hdr']
-    images = load_images_from_folder(
-        folder_path,
-        extensions=extensions,
-        force_reload=force_reload,
-        use_fake_user=True
-    )
-    
-    return {img.name: img for img in images}
-
-
-def load_textures(
-    folder_path: str | Path,
-    force_reload: bool = False
-) -> List[bpy.types.Image]:
-    """
-    Load all texture files from a folder.
-    
-    Args:
-        folder_path: Relative path to texture folder
-        force_reload: If True, reload from disk
-        
-    Returns:
-        List of loaded Image datablocks
-    """
-    extensions = ['.png', '.jpg', '.jpeg', '.tif', '.tiff']
-    return load_images_from_folder(
-        folder_path,
-        extensions=extensions,
-        force_reload=force_reload,
-        use_fake_user=True
-    )
 

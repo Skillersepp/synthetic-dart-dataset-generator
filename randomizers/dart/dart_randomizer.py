@@ -8,7 +8,7 @@ from randomizers.base_randomizer import BaseRandomizer
 from .dart_config import DartRandomConfig
 from .dart import Dart
 from utils.node_utils import set_geometry_node_input, find_node_group, set_node_input
-from utils.asset_utils import load_textures
+from utils.asset_utils import get_texture_paths, load_single_image
 
 class DartRandomizer(BaseRandomizer):
     """
@@ -22,21 +22,19 @@ class DartRandomizer(BaseRandomizer):
     def __init__(self, seed: int, config: Optional[DartRandomConfig] = None, base_path: Path = None):
         # Note: base_path is kept for backwards compatibility but asset_utils uses
         # the globally set base path from SceneRandomizer initialization
-        self.flight_textures_flags: List[bpy.types.Image] = []
-        self.flight_textures_outpainted: List[bpy.types.Image] = []
+        self._flight_texture_paths_flags: List[Path] = []
+        self._flight_texture_paths_outpainted: List[Path] = []
         super().__init__(seed, config or DartRandomConfig())
 
     def _initialize(self) -> None:
-        """Load flight textures using asset_utils for consistent loading."""
-        # Load textures from paths defined in config
-        self.flight_textures_flags = load_textures(
-            self.config.flight_textures_flags_folder,
-            force_reload=True
+        """Scan flight texture paths (fast, no image loading)."""
+        self._flight_texture_paths_flags = get_texture_paths(
+            self.config.flight_textures_flags_folder
         )
-        self.flight_textures_outpainted = load_textures(
-            self.config.flight_textures_outpainted_folder,
-            force_reload=True
+        self._flight_texture_paths_outpainted = get_texture_paths(
+            self.config.flight_textures_outpainted_folder
         )
+        print(f"[DartRandomizer] Found {len(self._flight_texture_paths_flags)} flags + {len(self._flight_texture_paths_outpainted)} outpainted texture paths")
 
     def setup_geometry_references(self, dart: Dart) -> None:
         """
@@ -229,12 +227,12 @@ class DartRandomizer(BaseRandomizer):
         mode = self.rng.choices(range(4), weights=probs, k=1)[0]
 
         if mode == 0: # Flags
-            self._set_flight_texture(group_node, self.flight_textures_flags)
+            self._set_flight_texture(group_node, self._flight_texture_paths_flags)
             set_node_input(group_node, "Mix_factor_1", 0.0)
             set_node_input(group_node, "Mix_factor_2", 0.0)
             
         elif mode == 1: # Outpainted
-            self._set_flight_texture(group_node, self.flight_textures_outpainted)
+            self._set_flight_texture(group_node, self._flight_texture_paths_outpainted)
             set_node_input(group_node, "Mix_factor_1", 0.0)
             set_node_input(group_node, "Mix_factor_2", 0.0)
             
@@ -403,12 +401,16 @@ class DartRandomizer(BaseRandomizer):
         r, g, b = colorsys.hsv_to_rgb(h, s, v)
         return (r, g, b, 1.0)
 
-    def _set_flight_texture(self, group_node: bpy.types.Node, texture_list: List[bpy.types.Image]) -> None:
-        """Pick a random texture from the list and assign it to the Image Texture node inside the group."""
-        if not texture_list:
+    def _set_flight_texture(self, group_node: bpy.types.Node, texture_paths: List[Path]) -> None:
+        """Pick a random texture from the path list, load it, and assign to the Image Texture node."""
+        if not texture_paths:
             return
             
-        image = self.rng.choice(texture_list)
+        texture_path = self.rng.choice(texture_paths)
+        image = load_single_image(texture_path, use_fake_user=False)
+        
+        if not image:
+            return
         
         # Find Image Texture node inside the group
         img_node = None

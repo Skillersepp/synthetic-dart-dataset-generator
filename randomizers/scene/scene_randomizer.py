@@ -1,11 +1,11 @@
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 import bpy
 import math
 
 from randomizers.base_randomizer import BaseRandomizer
 from .scene_config import SceneRandomConfig
-from utils.asset_utils import set_base_path, load_hdris
+from utils.asset_utils import set_base_path, get_texture_paths, load_single_image
 
 
 class SceneRandomizer(BaseRandomizer):
@@ -21,7 +21,7 @@ class SceneRandomizer(BaseRandomizer):
         # Set base path for asset loading (shared across all randomizers)
         if base_path:
             set_base_path(base_path)
-        self.hdri_images: Dict[str, bpy.types.Image] = {}
+        self._hdri_paths: List[Path] = []
         super().__init__(seed, config)
 
     # ---------------------------------------------------------------------
@@ -29,22 +29,15 @@ class SceneRandomizer(BaseRandomizer):
     # ---------------------------------------------------------------------
 
     def _initialize(self) -> None:
-        """Load all HDRIs once during initialization."""
-        self._load_all_hdris()
+        """Scan HDRI paths during initialization (fast, no image loading)."""
+        self._hdri_paths = get_texture_paths(
+            self.config.hdri_folder,
+            extensions=['.exr', '.hdr']
+        )
+        print(f"[SceneRandomizer] Found {len(self._hdri_paths)} HDRI paths")
+        
         if bpy.context.scene:
             self._ensure_hdri_node_setup(bpy.context.scene)
-
-    def _load_all_hdris(self) -> None:
-        """
-        Load all HDRI files from the configured folder into Blender's data structure.
-        This is done once at initialization for efficiency.
-        Uses asset_utils for consistent asset loading.
-        """
-        # Use asset_utils to load HDRIs
-        self.hdri_images = load_hdris(
-            self.config.hdri_folder,
-            force_reload=True
-        )
 
     def _ensure_hdri_node_setup(self, scene):
         """
@@ -119,11 +112,9 @@ class SceneRandomizer(BaseRandomizer):
         """
         Randomly select and apply an HDRI environment texture with random rotation and strength.
         """
-        if not self.hdri_images:
-            # print("No HDRIs available for randomization")
+        if not self._hdri_paths:
             return
 
-        # self._ensure_hdri_node_setup(scene) # Removed to avoid node tree modification during render
         world = scene.world
         if not world or not world.node_tree:
             return
@@ -131,30 +122,20 @@ class SceneRandomizer(BaseRandomizer):
         nodes = world.node_tree.nodes
         
         if "ENV_TEX" not in nodes or "MAPPING" not in nodes or "BG" not in nodes:
-            # print("HDRI nodes missing, skipping randomization")
             return
 
         env_tex = nodes["ENV_TEX"]
         mapping = nodes["MAPPING"]
         background = nodes["BG"]
 
-        # HDRI auswählen
-        hdri_key = self.rng.choice(list(self.hdri_images.keys()))
-        new_image = self.hdri_images[hdri_key]
+        # HDRI auswählen und bei Bedarf laden
+        hdri_path = self.rng.choice(self._hdri_paths)
+        new_image = load_single_image(hdri_path, use_fake_user=True)
         
-        # Verify image is valid
-        try:
-             _ = new_image.name
-        except ReferenceError:
-             # Image is dead, try to recover it from bpy.data.images or skip
-             if hdri_key in bpy.data.images:
-                 new_image = bpy.data.images[hdri_key]
-                 self.hdri_images[hdri_key] = new_image # Update cache
-             else:
-                 print(f"HDRI {hdri_key} missing or invalid. Skipping.")
-                 return
+        if not new_image:
+            return
 
-        # Optimization: Only assign if different to avoid unnecessary updates/crashes
+        # Optimization: Only assign if different to avoid unnecessary updates
         if env_tex.image != new_image:
             env_tex.image = new_image
 
