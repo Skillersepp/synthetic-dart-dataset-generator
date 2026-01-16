@@ -15,7 +15,7 @@ output/
 dataset/
 
 # Assets
-assets/
+assets/*
 
 # OS
 .DS_Store
