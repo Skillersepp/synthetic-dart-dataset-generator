@@ -15,29 +15,31 @@ import bpy
 DEV_RELOAD = True  # Set to False for production / faster execution
 
 PROJECT_MODULES = [
-	"utils.math_utils",
-	"utils.camera_utils",
-	"utils.node_utils",
-	"utils.color_utils",
-	"utils.dartboard_layout",
-	"randomizers.base_randomizer",
-	"randomizers.camera.camera_config",
-	"randomizers.camera.camera_randomizer",
-	"randomizers.camera",
-	"randomizers.scene.scene_config",
-	"randomizers.scene.scene_randomizer",
-	"randomizers.scene",
-	"randomizers.dartboard.dartboard_config",
-	"randomizers.dartboard.dartboard_randomizer",
-	"randomizers.dartboard",
-	"randomizers.dart.dart_config",
-	"randomizers.dart.dart_randomizer",
-	"randomizers.dart",
-	"randomizers.throw.throw_config",
-	"randomizers.throw.throw_randomizer",
-	"randomizers.throw",
-	"randomizers.annotation_manager",
-	"randomization_manager",
+    "utils",
+    "utils.asset_utils",
+    "utils.math_utils",
+    "utils.camera_utils",
+    "utils.node_utils",
+    "utils.color_utils",
+    "utils.dartboard_layout",
+    "randomizers.base_randomizer",
+    "randomizers.camera.camera_config",
+    "randomizers.camera.camera_randomizer",
+    "randomizers.camera",
+    "randomizers.scene.scene_config",
+    "randomizers.scene.scene_randomizer",
+    "randomizers.scene",
+    "randomizers.dartboard.dartboard_config",
+    "randomizers.dartboard.dartboard_randomizer",
+    "randomizers.dartboard",
+    "randomizers.dart.dart_config",
+    "randomizers.dart.dart_randomizer",
+    "randomizers.dart",
+    "randomizers.throw.throw_config",
+    "randomizers.throw.throw_randomizer",
+    "randomizers.throw",
+    "randomizers.annotation_manager",
+    "randomization_manager",
 ]
 
 def _dev_hot_reload():
@@ -117,4 +119,3 @@ on_frame_change_pre(bpy.context.scene)
 bpy.context.view_layer.update()
 
 
-	

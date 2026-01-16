@@ -8,6 +8,7 @@ from randomizers.base_randomizer import BaseRandomizer
 from .dart_config import DartRandomConfig
 from .dart import Dart
 from utils.node_utils import set_geometry_node_input, find_node_group, set_node_input
+from utils.asset_utils import load_textures
 
 class DartRandomizer(BaseRandomizer):
     """
@@ -19,43 +20,23 @@ class DartRandomizer(BaseRandomizer):
     """
 
     def __init__(self, seed: int, config: Optional[DartRandomConfig] = None, base_path: Path = None):
-        self.base_path = base_path or Path.cwd()
+        # Note: base_path is kept for backwards compatibility but asset_utils uses
+        # the globally set base path from SceneRandomizer initialization
         self.flight_textures_flags: List[bpy.types.Image] = []
         self.flight_textures_outpainted: List[bpy.types.Image] = []
         super().__init__(seed, config or DartRandomConfig())
 
     def _initialize(self) -> None:
-        """Load flight textures."""
-        base_path = self.base_path / "assets/Textures/Dart/Flight"
-        self.flight_textures_flags = self._load_textures(base_path / "flags")
-        self.flight_textures_outpainted = self._load_textures(base_path / "outpainted")
-
-    def _load_textures(self, path: Path) -> List[bpy.types.Image]:
-        """Load all images from a directory."""
-        images = []
-        if not path.exists():
-            print(f"[DartRandomizer] Warning: Texture path not found: {path}")
-            return images
-            
-        for img_file in path.glob("*"):
-            if img_file.suffix.lower() in ['.png', '.jpg', '.jpeg', '.tif', '.tiff']:
-                try:
-                    # Optimization: Reload existing image instead of remove/load
-                    # This preserves references in materials and is faster than removing used datablocks
-                    if img_file.name in bpy.data.images:
-                        img = bpy.data.images[img_file.name]
-                        # Force reload from disk to get latest changes
-                        img.reload()
-                    else:
-                        # Use absolute path to ensure Blender finds the file
-                        img = bpy.data.images.load(str(img_file.resolve()), check_existing=True)
-                    
-                    img.use_fake_user = True
-                    images.append(img)
-                except Exception as e:
-                    print(f"[DartRandomizer] Failed to load texture {img_file}: {e}")
-        print(f"[DartRandomizer] Loaded {len(images)} textures from {path}")
-        return images
+        """Load flight textures using asset_utils for consistent loading."""
+        # Load textures from paths defined in config
+        self.flight_textures_flags = load_textures(
+            self.config.flight_textures_flags_folder,
+            force_reload=True
+        )
+        self.flight_textures_outpainted = load_textures(
+            self.config.flight_textures_outpainted_folder,
+            force_reload=True
+        )
 
     def setup_geometry_references(self, dart: Dart) -> None:
         """

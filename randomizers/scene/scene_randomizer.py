@@ -5,6 +5,7 @@ import math
 
 from randomizers.base_randomizer import BaseRandomizer
 from .scene_config import SceneRandomConfig
+from utils.asset_utils import set_base_path, load_hdris
 
 
 class SceneRandomizer(BaseRandomizer):
@@ -17,7 +18,9 @@ class SceneRandomizer(BaseRandomizer):
     """
 
     def __init__(self, seed: int, config: SceneRandomConfig, base_path: Path = None):
-        self.base_path = base_path or Path.cwd()
+        # Set base path for asset loading (shared across all randomizers)
+        if base_path:
+            set_base_path(base_path)
         self.hdri_images: Dict[str, bpy.types.Image] = {}
         super().__init__(seed, config)
 
@@ -35,43 +38,13 @@ class SceneRandomizer(BaseRandomizer):
         """
         Load all HDRI files from the configured folder into Blender's data structure.
         This is done once at initialization for efficiency.
+        Uses asset_utils for consistent asset loading.
         """
-        hdri_path = self.base_path / self.config.hdri_folder
-        
-        if not hdri_path.exists():
-            print(f"Warning: HDRI folder not found at {hdri_path}")
-            return
-        
-        # Find all HDR/EXR files
-        hdri_files = list(hdri_path.glob("*.exr")) + list(hdri_path.glob("*.hdr"))
-        
-        if not hdri_files:
-            print(f"Warning: No HDRI files found in {hdri_path}")
-            return
-        
-        print(f"Loading {len(hdri_files)} HDRIs from {hdri_path}...")
-        
-        # Load/Link HDRIs safely
-        for hdri_file in hdri_files:
-            try:
-                # Check if image already exists
-                if hdri_file.name in bpy.data.images:
-                    img = bpy.data.images[hdri_file.name]
-                    img.reload()
-                else:
-                    # Load new image
-                    img = bpy.data.images.load(str(hdri_file), check_existing=True)
-                
-                print(f"  - Loaded: {hdri_file.name}")
-                
-                # Ensure image persists in memory
-                img.use_fake_user = True
-                self.hdri_images[hdri_file.name] = img
-                
-            except Exception as e:
-                print(f"  - Failed to load {hdri_file.name}: {e}")
-        
-        print(f"Successfully loaded {len(self.hdri_images)} HDRIs")
+        # Use asset_utils to load HDRIs
+        self.hdri_images = load_hdris(
+            self.config.hdri_folder,
+            force_reload=True
+        )
 
     def _ensure_hdri_node_setup(self, scene):
         """

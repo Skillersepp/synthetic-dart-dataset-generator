@@ -14,9 +14,6 @@ class DartboardRandomizer(BaseRandomizer):
     Supports:
     - Score texture materials (cracks, holes, field colors)
     - Number ring material (digit wear)
-    
-    Extensible for:
-    - Geometry Nodes modifiers (future)
     """
 
     def __init__(self, seed: int, config: Optional[DartboardRandomConfig] = None):
