@@ -7,7 +7,7 @@ from randomizers.scene import SceneRandomizer, SceneRandomConfig
 from randomizers.dartboard import DartboardRandomizer, DartboardRandomConfig, RangeOrFixed
 from randomizers.dart import DartRandomizer, DartRandomConfig
 from randomizers.throw import ThrowRandomizer, ThrowRandomConfig
-from randomizers.annotation_manager import AnnotationManager
+from utils import AnnotationManager
 
 
 class RandomizationManager:

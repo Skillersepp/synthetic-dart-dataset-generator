@@ -7,7 +7,7 @@ from randomizers.base_randomizer import BaseRandomizer
 from .throw_config import ThrowRandomConfig
 from randomizers.dart.dart_randomizer import DartRandomizer
 from randomizers.dart.dart import Dart
-from utils.dartboard_layout import DartboardLayout
+from utils import DartboardLayout
 
 class ThrowRandomizer(BaseRandomizer):
     """
@@ -148,7 +148,7 @@ class ThrowRandomizer(BaseRandomizer):
              self._clear_existing_darts()
              self._spawn_dart_pool()
 
-        base_seed = self.rng.randint(0, 100000)
+        base_seed = self.rng.randint(0, 1000000)
         
         for i, dart in enumerate(self.spawned_darts):
             if not dart or not dart.root: continue
@@ -162,13 +162,13 @@ class ThrowRandomizer(BaseRandomizer):
                 if self.config.same_appearance:
                     dart_seed = base_seed
                 else:
-                    dart_seed = self.rng.randint(0, 100000)
+                    dart_seed = self.rng.randint(0, 1000000)
                 
                 self.dart_randomizer.update_seed(dart_seed)
                 self.dart_randomizer.randomize(dart=dart)
             
             # Randomize Position/Rotation
-            self._randomize_transform(dart.root)
+            self._randomize_transform(dart)
             
             # --- Visibility Logic ---
             # Calculate radius from current location (assuming board center is 0,0,0)
@@ -277,8 +277,10 @@ class ThrowRandomizer(BaseRandomizer):
         new_root = copy_recursive(root_obj)
         return new_root
 
-    def _randomize_transform(self, obj: bpy.types.Object) -> None:
-        """Apply random position and rotation."""
+    def _randomize_transform(self, dart) -> None:
+        """Apply random position and rotation to a dart."""
+        obj = dart.root
+        
         # Position (Polar Coordinates)
         angle = self.rng.random() * 2 * math.pi
         radius = self.rng.random() * self.config.max_radius
@@ -288,6 +290,11 @@ class ThrowRandomizer(BaseRandomizer):
         
         # Validate angle using DartboardLayout
         angle = self.board_layout.validate_angle(radius, angle)
+        
+        # Store polar coordinates and score in the Dart object for annotation
+        dart.polar_radius = radius
+        dart.polar_angle = angle
+        dart.score = self.board_layout.get_score_from_polar(radius, angle)
         
         x = radius * math.cos(angle)
         y = radius * math.sin(angle)

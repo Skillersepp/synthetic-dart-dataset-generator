@@ -5,7 +5,12 @@ class DartboardLayout:
     Represents the physical layout of a standard WDF dartboard.
     Provides methods for coordinate validation and field identification.
     """
+
+    # Segment Scores (starting from 6 and going counter-clockwise)
+    SEGMENTS = [6, 13, 4, 18, 1, 20, 5, 12, 9, 14, 11, 8, 16, 7, 19, 3, 17, 2, 15, 10]
     
+    SEGMENT_WIDTH_RAD = math.radians(18)  # Each segment is 18 degrees wide = 2π/20 radians
+
     # Dimensions in mm (WDF Standards)
     R_INNER_BULL = 6.35
     R_OUTER_BULL = 15.9
@@ -150,9 +155,48 @@ class DartboardLayout:
                 
         return angle_rad
 
-    def get_field_from_polar(self, radius_m: float, angle_rad: float):
+    def get_score_from_polar(self, radius_m: float, angle_rad: float):
         """
-        Determines the dartboard field from polar coordinates.
-        (Placeholder for future implementation)
+        Determines the dart score from polar coordinates.
+
+        Args:
+            radius_m: Radius in meters.
+            angle_rad: Angle in radians.
+            
+        Returns:
+            Dart score.
         """
-        pass
+
+        r_mm = radius_m * 1000.0
+
+        # ---------- special cases ----------
+        if r_mm > self.R_OUTER_DOUBLE:
+            return 0   # Miss
+
+        if r_mm <= self.R_INNER_BULL:
+            return 50  # Bullseye
+
+        if r_mm <= self.R_OUTER_BULL:
+            return 25  # Single Bull
+
+
+        # ---------- Determine segment ----------
+        # Normalize angle to [0, 2π)
+        theta = angle_rad % (2 * math.pi)
+
+        # Offset by half segment to align with segment
+        theta_shifted = theta + self.SEGMENT_WIDTH_RAD / 2
+
+        index = int(theta_shifted / self.SEGMENT_WIDTH_RAD) % 20
+
+        base_value = self.SEGMENTS[index]
+
+        # ---------- Treble / Double ----------
+        if self.R_INNER_TREBLE <= r_mm <= self.R_OUTER_TREBLE:
+            return 3 * base_value
+
+        if self.R_INNER_DOUBLE <= r_mm <= self.R_OUTER_DOUBLE:
+            return 2 * base_value
+
+        # ---------- Single ----------
+        return base_value

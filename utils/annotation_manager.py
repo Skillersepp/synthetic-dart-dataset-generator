@@ -213,7 +213,10 @@ class AnnotationManager:
                         "x": coords.x,
                         "y": coords.y,
                         "z_depth": coords.z,
-                        "is_visible": coords.z > 0
+                        "is_visible": coords.z > 0,
+                        "polar_radius": dart.polar_radius,
+                        "polar_angle": dart.polar_angle,
+                        "score": dart.score
                     })
 
         # Write to JSON file

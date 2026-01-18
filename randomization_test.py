@@ -22,6 +22,7 @@ PROJECT_MODULES = [
     "utils.node_utils",
     "utils.color_utils",
     "utils.dartboard_layout",
+	"utils.annotation_manager",
     "randomizers.base_randomizer",
     "randomizers.camera.camera_config",
     "randomizers.camera.camera_randomizer",
@@ -38,7 +39,6 @@ PROJECT_MODULES = [
     "randomizers.throw.throw_config",
     "randomizers.throw.throw_randomizer",
     "randomizers.throw",
-    "randomizers.annotation_manager",
     "randomization_manager",
 ]
 

@@ -108,7 +108,7 @@ class DartboardRandomizer(BaseRandomizer):
             self._initialize_outer_ring()
         
         # Generate shared values for score materials and outer ring
-        shared_seed = self.rng.randint(0, 10000)
+        shared_seed = self.rng.randint(0, 1000000)
         shared_crack_factor = self.config.crack_factor.get_value(self.rng) if self.config.randomize_cracks else None
         shared_hole_factor = self.config.hole_factor.get_value(self.rng) if self.config.randomize_holes else None
         shared_black_color = self._get_randomized_color(self.config.field_color_black)
@@ -249,7 +249,7 @@ class DartboardRandomizer(BaseRandomizer):
             return
         
         # Set seed
-        set_node_input(group_node, "Seed", self.rng.randint(0, 10000))
+        set_node_input(group_node, "Seed", self.rng.randint(0, 1000000))
         
         # Wear Level
         if self.config.randomize_wear:
@@ -318,7 +318,7 @@ class DartboardRandomizer(BaseRandomizer):
         Uses a shared seed for consistent wire appearance across all modifiers.
         """
         # Generate a shared seed for consistent wire appearance
-        wire_seed = self.rng.randint(0, 10000)
+        wire_seed = self.rng.randint(0, 1000000)
         
         # Iterate over all configured geometry node modifiers
         for obj_name, modifier_name in self.config.geometry_node_modifiers.items():

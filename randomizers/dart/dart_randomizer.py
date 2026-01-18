@@ -96,7 +96,7 @@ class DartRandomizer(BaseRandomizer):
             length = self.config.tip_length.get_value(self.rng)
             dart.tip_length = length # Cache value
             set_geometry_node_input(dart.tip, dart.tip_mod, "Length", length)
-            set_geometry_node_input(dart.tip, dart.tip_mod, "Seed", self.rng.randint(0, 10000))
+            set_geometry_node_input(dart.tip, dart.tip_mod, "Seed", self.rng.randint(0, 1000000))
             dart.tip.update_tag()
 
         # 2. Barrel Generator
@@ -106,7 +106,7 @@ class DartRandomizer(BaseRandomizer):
             dart.barrel_length = length # Cache value
             set_geometry_node_input(dart.barrel, dart.barrel_mod, "Length", length)
             set_geometry_node_input(dart.barrel, dart.barrel_mod, "Thickness", thickness)
-            set_geometry_node_input(dart.barrel, dart.barrel_mod, "Seed", self.rng.randint(0, 10000))
+            set_geometry_node_input(dart.barrel, dart.barrel_mod, "Seed", self.rng.randint(0, 1000000))
             dart.barrel.update_tag()
 
         # 3. Shaft Generator
@@ -116,7 +116,7 @@ class DartRandomizer(BaseRandomizer):
             dart.shaft_length = length # Cache value
             set_geometry_node_input(dart.shaft, dart.shaft_mod, "Length", length)
             set_geometry_node_input(dart.shaft, dart.shaft_mod, "Shape_mix_factor", mix)
-            set_geometry_node_input(dart.shaft, dart.shaft_mod, "Seed", self.rng.randint(0, 10000))
+            set_geometry_node_input(dart.shaft, dart.shaft_mod, "Seed", self.rng.randint(0, 1000000))
             dart.shaft.update_tag()
 
         # 4. Flight Generator
@@ -353,7 +353,7 @@ class DartRandomizer(BaseRandomizer):
         # 2. Find Node Group and set Seed
         group_node = find_node_group(material.node_tree, "NG_Barrel_Domain_Randomization")
         if group_node:
-            set_node_input(group_node, "Seed", self.rng.randint(0, 10000))
+            set_node_input(group_node, "Seed", self.rng.randint(0, 1000000))
         else:
             print(f"[DartRandomizer] Node Group 'NG_Barrel_Domain_Randomization' not found in material '{material.name}'")
 
@@ -389,7 +389,7 @@ class DartRandomizer(BaseRandomizer):
         # 2. Find Node Group and set Seed
         group_node = find_node_group(material.node_tree, "NG_Tip_Domain_Randomization")
         if group_node:
-            set_node_input(group_node, "Seed", self.rng.randint(0, 10000))
+            set_node_input(group_node, "Seed", self.rng.randint(0, 1000000))
         else:
             print(f"[DartRandomizer] Node Group 'NG_Tip_Domain_Randomization' not found in material '{material.name}'")
 
