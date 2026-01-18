@@ -15,6 +15,7 @@ import bpy
 DEV_RELOAD = True  # Set to False for production / faster execution
 
 PROJECT_MODULES = [
+    "config",
     "utils",
     "utils.asset_utils",
     "utils.math_utils",
@@ -62,10 +63,57 @@ def _dev_hot_reload():
 _dev_hot_reload()
 
 
+from config import DatasetConfig
+from utils.dataset_utils import setup_output_paths, setup_blender_render_path
 from randomization_manager import RandomizationManager
 from bpy.app.handlers import persistent
 
-manager = RandomizationManager(global_seed=0, base_path=PROJECT_ROOT)
+# === Dataset Configuration ===
+config = DatasetConfig(
+    global_seed=1,
+    start_frame=1,
+    end_frame=50,
+)
+
+# Set frame range in Blender
+bpy.context.scene.frame_start = config.start_frame
+bpy.context.scene.frame_end = config.end_frame
+
+# Paths will be set up when rendering starts
+images_path = None
+labels_path = None
+manager = None
+_render_initialized = False
+
+def _initialize_for_render():
+    """Initialize output paths and manager when rendering starts."""
+    global images_path, labels_path, manager, _render_initialized
+    
+    if _render_initialized:
+        return
+    
+    # Setup output directories (creates folders)
+    images_path, labels_path = setup_output_paths(PROJECT_ROOT, config)
+    
+    # Configure Blender render output
+    setup_blender_render_path(images_path, config.render_transparent)
+    
+    # Initialize manager with paths
+    manager = RandomizationManager(
+        global_seed=config.global_seed,
+        base_path=PROJECT_ROOT,
+        labels_path=labels_path
+    )
+    
+    _render_initialized = True
+    print("[Init] Render initialization complete.")
+
+# Initialize manager for viewport preview (without creating folders)
+preview_manager = RandomizationManager(
+    global_seed=config.global_seed,
+    base_path=PROJECT_ROOT,
+    labels_path=PROJECT_ROOT / config.output_base / config.dataset_name / "labels"  # Not created yet
+)
 bpy.context.scene.render.use_lock_interface = True  # Lock UI during rendering
 
 @persistent
@@ -80,10 +128,21 @@ def on_frame_change_pre(scene):
 	camera = scene.camera
 	frame = scene.frame_current
 	
+	# Use render manager if initialized, otherwise preview manager
+	active_manager = manager if _render_initialized else preview_manager
+	
 	try:
-		manager.randomize(frame, camera, scene)
+		active_manager.randomize(frame, camera, scene)
 	except Exception as e:
 		print(f"Error in frame_change_pre: {e}")
+
+@persistent
+def on_render_init(scene):
+	"""
+	Called ONCE before rendering starts (before first frame).
+	Use this to setup output directories.
+	"""
+	_initialize_for_render()
 
 @persistent
 def on_render_post(scene):
@@ -94,26 +153,57 @@ def on_render_post(scene):
 	
 	if not scene or not scene.camera:
 		return
+	
+	if not manager:
+		print("[Warning] Manager not initialized, skipping annotation.")
+		return
+		
 	try:
 		manager.annotation_manager.annotate(scene, scene.camera)
 	except Exception as e:
 		print(f"Error in render_post: {e}")
+
+@persistent
+def on_render_complete(scene):
+	"""Called when render animation completes."""
+	global _render_initialized
+	_render_initialized = False
+	print("[Init] Render complete. Reset initialization flag.")
+
+@persistent
+def on_render_cancel(scene):
+	"""Called when render is cancelled."""
+	global _render_initialized
+	_render_initialized = False
+	print("[Init] Render cancelled. Reset initialization flag.")
 
 # Register event handlers
 # Clear old handlers
 for h in [h for h in bpy.app.handlers.frame_change_pre if h.__name__ in ("on_frame_change_pre", "on_frame_change")]:
     bpy.app.handlers.frame_change_pre.remove(h)
 
+for h in [h for h in bpy.app.handlers.render_init if h.__name__ == "on_render_init"]:
+    bpy.app.handlers.render_init.remove(h)
+
 for h in [h for h in bpy.app.handlers.render_post if h.__name__ == "on_render_post"]:
     bpy.app.handlers.render_post.remove(h)
 
+for h in [h for h in bpy.app.handlers.render_complete if h.__name__ == "on_render_complete"]:
+    bpy.app.handlers.render_complete.remove(h)
+
+for h in [h for h in bpy.app.handlers.render_cancel if h.__name__ == "on_render_cancel"]:
+    bpy.app.handlers.render_cancel.remove(h)
+
 # Append new handlers
 bpy.app.handlers.frame_change_pre.append(on_frame_change_pre)
+bpy.app.handlers.render_init.append(on_render_init)
 bpy.app.handlers.render_post.append(on_render_post)
+bpy.app.handlers.render_complete.append(on_render_complete)
+bpy.app.handlers.render_cancel.append(on_render_cancel)
 
-print(f"Handlers registered: Pre ({len(bpy.app.handlers.frame_change_pre)}), Render Post ({len(bpy.app.handlers.render_post)})")
+print(f"Handlers registered: Pre ({len(bpy.app.handlers.frame_change_pre)}), Render Init ({len(bpy.app.handlers.render_init)}), Render Post ({len(bpy.app.handlers.render_post)})")
 
-# Initial trigger
+# Initial trigger for viewport preview
 on_frame_change_pre(bpy.context.scene)
 # Force update for the initial state
 bpy.context.view_layer.update()

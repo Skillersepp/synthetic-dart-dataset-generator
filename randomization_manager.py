@@ -18,9 +18,10 @@ class RandomizationManager:
     Only seeds are updated per frame.
     """
 
-    def __init__(self, global_seed: int, base_path: Path = None):
+    def __init__(self, global_seed: int, base_path: Path = None, labels_path: Path = None):
         self.global_seed = global_seed
         self.base_path = base_path or Path.cwd()
+        self.labels_path = labels_path or (self.base_path / "output" / f"dataset_{global_seed}" / "labels")
         
         # Initialize all randomizers ONCE with initial seeds
         # Heavy initialization (e.g., loading HDRIs) happens here
@@ -69,7 +70,7 @@ class RandomizationManager:
         )
 
         # Annotation Manager
-        self.annotation_manager = AnnotationManager(self.throw_randomizer, self.base_path)
+        self.annotation_manager = AnnotationManager(self.throw_randomizer, self.labels_path)
 
     def _make_seed(self, tag: str, index: int) -> int:
         """Deterministic sub-seed generation."""
