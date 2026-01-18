@@ -9,11 +9,11 @@ from pathlib import Path
 from randomizers.throw.throw_randomizer import ThrowRandomizer
 
 class AnnotationManager:
-    def __init__(self, throw_randomizer: ThrowRandomizer, base_path: Path):
+    def __init__(self, throw_randomizer: ThrowRandomizer, labels_path: Path):
         self.throw_randomizer = throw_randomizer
         # Output directory for labels
-        self.output_dir = base_path / "output" / "dataset_v1" / "labels"
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.output_dir = labels_path
+        #self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def get_normalized_coords(self, scene: bpy.types.Scene, camera: bpy.types.Object, world_coord: Vector) -> Vector:
         """
