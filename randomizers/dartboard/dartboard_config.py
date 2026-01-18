@@ -122,7 +122,7 @@ class DartboardRandomConfig:
     # -------------------------------------------------------------------------
     # Enable/disable randomization per parameter group
     # -------------------------------------------------------------------------
-    randomize_cracks: bool = False
+    randomize_cracks: bool = True
     randomize_holes: bool = True
     randomize_wear: bool = True
     
