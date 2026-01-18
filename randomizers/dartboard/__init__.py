@@ -1,4 +1,11 @@
-from .dartboard_config import DartboardRandomConfig, RangeOrFixed, ColorVariation
+from .dartboard_config import (
+    DartboardRandomConfig,
+    RangeOrFixed,
+    ColorVariation,
+    WeightedChoice,
+    NormalDistribution,
+    OuterRingMappingConfig,
+)
 from .dartboard_randomizer import DartboardRandomizer
 
 __all__ = [
@@ -6,4 +13,7 @@ __all__ = [
     "DartboardRandomConfig",
     "RangeOrFixed",
     "ColorVariation",
+    "WeightedChoice",
+    "NormalDistribution",
+    "OuterRingMappingConfig",
 ]

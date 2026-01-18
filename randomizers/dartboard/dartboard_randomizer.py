@@ -34,6 +34,7 @@ class DartboardRandomizer(BaseRandomizer):
         # Cached node references (set during _initialize)
         self._outer_ring_image_node: Optional[bpy.types.ShaderNodeTexImage] = None
         self._outer_ring_group_node: Optional[bpy.types.ShaderNodeGroup] = None
+        self._outer_ring_mapping_node: Optional[bpy.types.ShaderNodeMapping] = None
 
     # -------------------------------------------------------------------------
     # INITIALIZATION (BaseRandomizer Interface)
@@ -83,6 +84,12 @@ class DartboardRandomizer(BaseRandomizer):
         for node in node_tree.nodes:
             if node.type == 'TEX_IMAGE':
                 self._outer_ring_image_node = node
+                break
+        
+        # Find and cache the Mapping node
+        for node in node_tree.nodes:
+            if node.type == 'MAPPING':
+                self._outer_ring_mapping_node = node
                 break
         
         # Find and cache the group_black_score_texture node
@@ -295,6 +302,9 @@ class DartboardRandomizer(BaseRandomizer):
             if texture:
                 self._outer_ring_image_node.image = texture
         
+        # Randomize Mapping node (Location, Rotation, Scale)
+        self._randomize_outer_ring_mapping()
+        
         # Apply values to cached group_black_score_texture node
         if self._outer_ring_group_node:
             set_node_input(self._outer_ring_group_node, "Seed", shared_seed)
@@ -305,6 +315,47 @@ class DartboardRandomizer(BaseRandomizer):
             
             if shared_hole_factor is not None:
                 set_node_input(self._outer_ring_group_node, "Hole_factor", shared_hole_factor)
+
+    def _randomize_outer_ring_mapping(self) -> None:
+        """
+        Randomize the Mapping node in the outer ring material.
+        
+        Randomizes:
+        - Location X: Uniform distribution
+        - Location Y: Normal distribution
+        - Rotation Z: Normal distribution (degrees converted to radians)
+        - Scale: Weighted integer choice (same for X, Y, Z)
+        """
+        import math
+        
+        if not self._outer_ring_mapping_node:
+            return
+        
+        mapping_config = self.config.outer_ring_mapping
+        if not mapping_config.randomize:
+            return
+        
+        mapping_node = self._outer_ring_mapping_node
+        
+        # Location X: Uniform distribution
+        loc_x = self.rng.uniform(mapping_config.location_x_min, mapping_config.location_x_max)
+        
+        # Location Y: Normal distribution
+        loc_y = mapping_config.location_y.get_value(self.rng)
+        
+        # Keep Z at 0 (no randomization for Z location)
+        mapping_node.inputs['Location'].default_value = (loc_x, loc_y, 0.0)
+        
+        # Rotation Z: Normal distribution (convert degrees to radians)
+        rot_z_deg = mapping_config.rotation_z_degrees.get_value(self.rng)
+        rot_z_rad = math.radians(rot_z_deg)
+        
+        # Keep X and Y rotation at 0
+        mapping_node.inputs['Rotation'].default_value = (0.0, 0.0, rot_z_rad)
+        
+        # Scale X: Weighted integer choice (Y and Z stay at 1)
+        scale_x = float(mapping_config.scale.get_value(self.rng))
+        mapping_node.inputs['Scale'].default_value = (scale_x, 1.0, 1.0)
 
     # -------------------------------------------------------------------------
     # GEOMETRY NODES
