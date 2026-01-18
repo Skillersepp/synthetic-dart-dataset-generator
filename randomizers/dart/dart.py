@@ -30,6 +30,11 @@ class Dart:
         self.flight_insertion_depth: float = 0.0
         self.flight_index: int = 0
         self.is_visible: bool = True
+        
+        # Polar coordinates relative to dartboard center (set by ThrowRandomizer)
+        self.polar_radius: float = 0.0  # in meters
+        self.polar_angle: float = 0.0   # in radians
+        self.score: int = 0             # calculated from polar coordinates
 
     def set_visibility(self, visible: bool) -> None:
         """
