@@ -1,5 +1,72 @@
 from dataclasses import dataclass, field
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
+import math
+
+
+@dataclass
+class WeightedChoice:
+    """
+    Allows weighted random selection from a list of values.
+    
+    Each value has an associated weight (probability).
+    Weights are normalized automatically.
+    """
+    values: List[int] = field(default_factory=lambda: [1])
+    weights: List[float] = field(default_factory=lambda: [1.0])
+    
+    def get_value(self, rng) -> int:
+        """Returns a weighted random value from the list."""
+        return rng.choices(self.values, weights=self.weights, k=1)[0]
+
+
+@dataclass
+class NormalDistribution:
+    """
+    Configuration for normal (Gaussian) distribution sampling.
+    
+    Optionally clamps values to a min/max range.
+    """
+    mean: float = 0.0
+    std_dev: float = 1.0
+    min_val: Optional[float] = None
+    max_val: Optional[float] = None
+    
+    def get_value(self, rng) -> float:
+        """Returns a normally distributed random value, optionally clamped."""
+        value = rng.gauss(self.mean, self.std_dev)
+        if self.min_val is not None:
+            value = max(self.min_val, value)
+        if self.max_val is not None:
+            value = min(self.max_val, value)
+        return value
+
+
+@dataclass
+class OuterRingMappingConfig:
+    """
+    Configuration for outer ring texture Mapping node randomization.
+    
+    Controls Location, Rotation and Scale of the texture mapping.
+    """
+    randomize: bool = True
+    
+    # Location: X uniform [0, 1], Y normal distribution
+    location_x_min: float = 0.0
+    location_x_max: float = 1.0
+    location_y: NormalDistribution = field(default_factory=lambda: NormalDistribution(
+        mean=0.0, std_dev=0.1
+    ))
+    
+    # Rotation: Z normal distribution (in degrees, will be converted to radians)
+    rotation_z_degrees: NormalDistribution = field(default_factory=lambda: NormalDistribution(
+        mean=0.0, std_dev=0.5
+    ))
+    
+    # Scale: Weighted integer choice (same value for X, Y, Z)
+    scale: WeightedChoice = field(default_factory=lambda: WeightedChoice(
+        values=[1, 2, 3, 4],
+        weights=[0.8, 0.1, 0.05, 0.05]  # 80%, 10%, 5%, 5%
+    ))
 
 
 @dataclass
@@ -115,6 +182,11 @@ class DartboardRandomConfig:
         value_variation=0.1,
         randomize=True
     ))
+    
+    # -------------------------------------------------------------------------
+    # Outer Ring Mapping Node Configuration
+    # -------------------------------------------------------------------------
+    outer_ring_mapping: OuterRingMappingConfig = field(default_factory=OuterRingMappingConfig)
     
     # -------------------------------------------------------------------------
     # Asset paths (relative to project root)
