@@ -39,15 +39,7 @@ class RandomizationManager:
         )
         
         # Dartboard Randomizer with default config
-        dartboard_cfg = DartboardRandomConfig(
-            randomize_cracks=True,
-            randomize_holes=True,
-            randomize_wear=True,
-            crack_factor=RangeOrFixed(0.0, 1.0),
-            hole_factor=RangeOrFixed(0.0, 1.0),
-            wear_level=RangeOrFixed(0.0, 1.0),
-            wear_contrast=RangeOrFixed(0.5, 1.0),
-        )
+        dartboard_cfg = DartboardRandomConfig()
         self.dartboard_randomizer = DartboardRandomizer(
             seed=self._make_seed("dartboard", 0),
             config=dartboard_cfg
