@@ -12,11 +12,11 @@ class DatasetConfig:
     """Configuration for dataset generation."""
     
     # Seed for reproducibility
-    global_seed: int = 42
+    global_seed: int = 0
     
     # Frame range
     start_frame: int = 1
-    end_frame: int = 20
+    end_frame: int = 200000
     
     # Output paths (relative to project root)
     output_base: str = "output"
