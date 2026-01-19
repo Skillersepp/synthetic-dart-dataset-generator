@@ -10,7 +10,7 @@ BLEND_FILE = "dev_scene.blend"
 PYTHON_SCRIPT = "randomization_test.py"
 
 # EIN gemeinsamer Ordner für alle
-OUTPUT_DIR = r"/home/student/Schreibtisch/synthetic-dart-dataset-generator/output/dataset_v1/images"
+#OUTPUT_DIR = r"/home/student/Schreibtisch/synthetic-dart-dataset-generator/output/dataset_v1/images"
 # --- ENDE KONFIGURATION ---
 
 def main():
@@ -19,24 +19,24 @@ def main():
         return
 
     # Gemeinsamen Ordner erstellen
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
+    #if not os.path.exists(OUTPUT_DIR):
+    #    os.makedirs(OUTPUT_DIR)
 
     # Der Pfad ist für ALLE Instanzen gleich
     # Blender ersetzt ###### durch die Frame-Nummer
-    shared_output_path = os.path.join(OUTPUT_DIR, "frame_######")
+    #shared_output_path = os.path.join(OUTPUT_DIR, "frame_######")
 
     # Der Befehl ist nun für alle gleich
     command = [
         "blender",
         "-b", BLEND_FILE,
         "-P", PYTHON_SCRIPT,
-        "-o", shared_output_path, # Alle schreiben hierhin
+        #"-o", shared_output_path, # Alle schreiben hierhin
         "-a"
     ]
 
     print(f"--- Starte Benchmark mit {NUM_INSTANCES} Instanzen ---")
-    print(f"Ziel: {OUTPUT_DIR} (Shared Rendering)")
+    #print(f"Ziel: {OUTPUT_DIR} (Shared Rendering)")
     print("-" * 60)
 
     processes = []
