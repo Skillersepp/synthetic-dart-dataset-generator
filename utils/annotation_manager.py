@@ -9,10 +9,12 @@ from pathlib import Path
 from randomizers.throw.throw_randomizer import ThrowRandomizer
 
 class AnnotationManager:
-    def __init__(self, throw_randomizer: ThrowRandomizer, labels_path: Path):
+    def __init__(self, throw_randomizer: ThrowRandomizer, labels_path: Path, frame_digits: int = 4):
         self.throw_randomizer = throw_randomizer
         # Output directory for labels
         self.output_dir = labels_path
+        # Number of digits for frame numbering (e.g., 6 for 000001.json)
+        self.frame_digits = frame_digits
         #self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def get_normalized_coords(self, scene: bpy.types.Scene, camera: bpy.types.Object, world_coord: Vector) -> Vector:
@@ -162,7 +164,7 @@ class AnnotationManager:
         bpy.context.view_layer.update()
 
         frame_idx = scene.frame_current
-        filename = f"{frame_idx:04d}.json"
+        filename = f"{frame_idx:0{self.frame_digits}d}.json"
         filepath = self.output_dir / filename
         
         data = {

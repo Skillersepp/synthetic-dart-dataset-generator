@@ -12,11 +12,11 @@ class DatasetConfig:
     """Configuration for dataset generation."""
     
     # Seed for reproducibility
-    global_seed: int = 0
+    global_seed: int = 42
     
     # Frame range
     start_frame: int = 1
-    end_frame: int = 50
+    end_frame: int = 20
     
     # Output paths (relative to project root)
     output_base: str = "output"
@@ -32,6 +32,11 @@ class DatasetConfig:
     def dataset_name(self) -> str:
         """Generate dataset folder name based on global seed."""
         return f"dataset_{self.global_seed}"
+    
+    @property
+    def frame_digits(self) -> int:
+        """Calculate the number of digits needed for frame numbering."""
+        return len(str(self.end_frame))
 
 
 # Default configuration instance

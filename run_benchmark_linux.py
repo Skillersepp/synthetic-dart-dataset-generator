@@ -39,6 +39,7 @@ def main():
     #print(f"Ziel: {OUTPUT_DIR} (Shared Rendering)")
     print("-" * 60)
 
+    start_time = time.time()
     processes = []
 
     try:
@@ -58,6 +59,10 @@ def main():
         for p in processes:
             p.kill()
         sys.exit(0)
+
+    end_time = time.time()
+    duration = end_time - start_time
+    print(f"Benchmark abgeschlossen in {duration:.2f} Sekunden.")
 
 if __name__ == "__main__":
     main()

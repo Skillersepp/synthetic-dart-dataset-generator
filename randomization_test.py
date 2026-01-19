@@ -91,14 +91,15 @@ def _initialize_for_render():
     # Setup output directories (creates folders)
     images_path, labels_path = setup_output_paths(PROJECT_ROOT, config)
     
-    # Configure Blender render output
-    setup_blender_render_path(images_path, config.render_transparent)
+    # Configure Blender render output with dynamic frame digits
+    setup_blender_render_path(images_path, config.render_transparent, config.frame_digits)
     
     # Initialize manager with paths
     manager = RandomizationManager(
         global_seed=config.global_seed,
         base_path=PROJECT_ROOT,
-        labels_path=labels_path
+        labels_path=labels_path,
+        frame_digits=config.frame_digits
     )
     
     _render_initialized = True
@@ -108,7 +109,8 @@ def _initialize_for_render():
 preview_manager = RandomizationManager(
     global_seed=config.global_seed,
     base_path=PROJECT_ROOT,
-    labels_path=PROJECT_ROOT / config.output_base / config.dataset_name / "labels"  # Not created yet
+    labels_path=PROJECT_ROOT / config.output_base / config.dataset_name / "labels",  # Not created yet
+    frame_digits=config.frame_digits
 )
 bpy.context.scene.render.use_lock_interface = True  # Lock UI during rendering
 
