@@ -57,9 +57,20 @@ class ThrowRandomizer(BaseRandomizer):
             return
             
         # Collect all objects in the collection
-        # Since we link all parts of the hierarchy to the collection, 
-        # iterating collection.objects is sufficient.
         objects_to_delete = [obj for obj in self.collection.objects]
+        
+        # Track data blocks to check for cleanup (Meshes, Materials)
+        meshes_to_check = set()
+        materials_to_check = set()
+        
+        for obj in objects_to_delete:
+            if obj.type == 'MESH' and obj.data:
+                meshes_to_check.add(obj.data)
+            
+            if hasattr(obj, "material_slots"):
+                for slot in obj.material_slots:
+                    if slot.material:
+                        materials_to_check.add(slot.material)
         
         # Use low-level remove to ensure deletion without selection context issues
         for obj in objects_to_delete:
@@ -70,6 +81,22 @@ class ThrowRandomizer(BaseRandomizer):
             
         self.spawned_darts.clear()
         self.spawned_k_points.clear()
+        
+        # Cleanup orphaned meshes
+        for mesh in meshes_to_check:
+            if mesh.users == 0:
+                try:
+                    bpy.data.meshes.remove(mesh)
+                except Exception as e:
+                     print(f"[ThrowRandomizer] Error removing orphan mesh: {e}")
+
+        # Cleanup orphaned materials
+        for mat in materials_to_check:
+            if mat.users == 0:
+                try:
+                    bpy.data.materials.remove(mat)
+                except Exception as e:
+                     print(f"[ThrowRandomizer] Error removing orphan material: {e}")
 
     def _spawn_dart_pool(self) -> None:
         """Spawn the configured number of darts into the pool."""

@@ -4,6 +4,7 @@ import random
 import importlib
 import os
 import time
+import gc
 
 # Ensure this project root is on sys.path so Blender can import local modules
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -65,6 +66,7 @@ _dev_hot_reload()
 
 from config import DatasetConfig
 from utils.dataset_utils import setup_output_paths, setup_blender_render_path
+from utils.asset_utils import cleanup_orphaned_images
 from randomization_manager import RandomizationManager
 from bpy.app.handlers import persistent
 
@@ -80,6 +82,7 @@ images_path = None
 labels_path = None
 manager = None
 _render_initialized = False
+_original_undo_state = True
 
 def _initialize_for_render():
     """Initialize output paths and manager when rendering starts."""
@@ -122,6 +125,9 @@ def on_frame_change_pre(scene):
 	"""
 	if not scene or not scene.camera:
 		return
+	start = time.time()
+	# Explicitly run garbage collection to free memory
+	# moved to periodic check below to save performance
 
 	camera = scene.camera
 	frame = scene.frame_current
@@ -134,13 +140,34 @@ def on_frame_change_pre(scene):
 	except Exception as e:
 		print(f"Error in frame_change_pre: {e}")
 
+	# Periodic cleanup of orphaned images (every 10 frames) to free VRAM/Blender data
+	if frame % 10 == 0:
+		cleanup_orphaned_images()
+
+	# Heavy GC (every 200 frames) to free Python memory
+	if frame % 200 == 0:
+		start_gc = time.time()
+		n_gc = gc.collect()
+		print(f"[GC] Frame {frame}: Collected {n_gc} objects in {time.time() - start_gc:.3f}s")
+	end = time.time()
+	print(f"[Frame {frame}] Randomization took {end - start:.3f} seconds.")
+
 @persistent
 def on_render_init(scene):
 	"""
 	Called ONCE before rendering starts (before first frame).
 	Use this to setup output directories.
 	"""
+	global _original_undo_state
+	# Disable Global Undo to prevent RAM explosion during long renders
+	_original_undo_state = bpy.context.preferences.edit.use_global_undo
+	bpy.context.preferences.edit.use_global_undo = False
+	print("[Init] Global Undo disabled for performance.")
+
 	_initialize_for_render()
+	
+	# Initial cleanup before starting
+	cleanup_orphaned_images()
 
 @persistent
 def on_render_post(scene):
@@ -157,23 +184,32 @@ def on_render_post(scene):
 		return
 		
 	try:
+		start = time.time()
 		manager.annotation_manager.annotate(scene, scene.camera)
+		end = time.time()
+		print(f"[Annotation] Frame {scene.frame_current} annotated in {end - start:.3f} seconds.")
 	except Exception as e:
 		print(f"Error in render_post: {e}")
 
 @persistent
 def on_render_complete(scene):
 	"""Called when render animation completes."""
-	global _render_initialized
+	global _render_initialized, _original_undo_state
 	_render_initialized = False
-	print("[Init] Render complete. Reset initialization flag.")
+
+	# Restore Undo state
+	bpy.context.preferences.edit.use_global_undo = _original_undo_state
+	print("[Init] Render complete. Reset initialization flag and Undo state.")
 
 @persistent
 def on_render_cancel(scene):
 	"""Called when render is cancelled."""
-	global _render_initialized
+	global _render_initialized, _original_undo_state
 	_render_initialized = False
-	print("[Init] Render cancelled. Reset initialization flag.")
+
+	# Restore Undo state
+	bpy.context.preferences.edit.use_global_undo = _original_undo_state
+	print("[Init] Render cancelled. Reset initialization flag and Undo state.")
 
 # Register event handlers
 # Clear old handlers

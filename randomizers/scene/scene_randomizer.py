@@ -130,7 +130,7 @@ class SceneRandomizer(BaseRandomizer):
 
         # HDRI auswählen und bei Bedarf laden
         hdri_path = self.rng.choice(self._hdri_paths)
-        new_image = load_single_image(hdri_path, use_fake_user=True)
+        new_image = load_single_image(hdri_path, use_fake_user=False)
         
         if not new_image:
             return
