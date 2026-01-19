@@ -69,11 +69,7 @@ from randomization_manager import RandomizationManager
 from bpy.app.handlers import persistent
 
 # === Dataset Configuration ===
-config = DatasetConfig(
-    global_seed=1,
-    start_frame=1,
-    end_frame=50,
-)
+config = DatasetConfig()
 
 # Set frame range in Blender
 bpy.context.scene.frame_start = config.start_frame

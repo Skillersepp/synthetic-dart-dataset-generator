@@ -201,12 +201,19 @@ class AnnotationManager:
         else:
             print("[Annotation] Warning: Collection 'Keypoints' not found.")
 
-        # --- 3. Dart Keypoints ---
+        # --- 3. Dart Keypoints and Bounding Boxes ---
         for i, dart in enumerate(self.throw_randomizer.spawned_darts):
             if dart.k_point:
                 # Only include if hide_render is False
                 if not dart.k_point.hide_render:
                     coords = self.get_normalized_coords(scene, camera, dart.k_point.matrix_world.translation)
+                    
+                    # Calculate bounding box for the entire dart hierarchy
+                    bbox = None
+                    
+                    if dart.root:
+                        bbox = self.get_bbox_from_object(scene, camera, dart.root)
+                    
                     data["darts"].append({
                         "dart_index": i,
                         "name": dart.k_point.name,
@@ -216,7 +223,8 @@ class AnnotationManager:
                         "is_visible": coords.z > 0,
                         "polar_radius": dart.polar_radius,
                         "polar_angle": dart.polar_angle,
-                        "score": dart.score
+                        "score": dart.score,
+                        "bbox": bbox
                     })
 
         # Write to JSON file
