@@ -16,7 +16,7 @@ class DatasetConfig:
     
     # Frame range
     start_frame: int = 1
-    end_frame: int = 100
+    end_frame: int = 50
     
     # Output paths (relative to project root)
     output_base: str = "output"
