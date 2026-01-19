@@ -41,19 +41,21 @@ def setup_output_paths(base_path: Path, config: "DatasetConfig") -> tuple[Path, 
     return images_path, labels_path
 
 
-def setup_blender_render_path(images_path: Path, transparent: bool = True) -> None:
+def setup_blender_render_path(images_path: Path, transparent: bool = True, frame_digits: int = 4) -> None:
     """
     Configure Blender's render output path and transparency settings.
     
     Args:
         images_path: Path to the images directory.
         transparent: Whether to render with transparent background.
+        frame_digits: Number of digits for frame numbering (e.g., 6 for 000001.png).
     """
     import bpy
     
-    # Set render output path (Blender expects a trailing slash for directories)
-    # Format: path/#### where #### is the frame number
-    render_path = str(images_path) + "/"
+    # Set render output path with frame number placeholder
+    # Blender uses '#' for each digit in the frame number
+    frame_placeholder = '#' * frame_digits
+    render_path = str(images_path) + "/" + frame_placeholder
     bpy.context.scene.render.filepath = render_path
     
     # Set file format
