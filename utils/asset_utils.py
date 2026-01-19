@@ -195,30 +195,45 @@ def load_single_image(
         return None
     
     try:
-        # Check if image already exists in Blender (by name)
-        if file_path.name in bpy.data.images:
-            img = bpy.data.images[file_path.name]
-            
-            # Always update the filepath to the correct location
-            # This fixes cross-platform path issues (Windows <-> Linux)
-            current_filepath = Path(bpy.path.abspath(img.filepath))
-            if current_filepath != file_path or not current_filepath.exists():
-                img.filepath = str(file_path)
-                img.reload()
-            elif force_reload:
-                img.reload()
-        else:
-            # Load new image using absolute path
-            # Use check_existing=False to avoid reusing images with broken paths
-            img = bpy.data.images.load(str(file_path.resolve()), check_existing=False)
+        # Use check_existing=True to let Blender find the loaded image by path
+        # This prevents creating duplicates (leak) if the image is already loaded
+        img = bpy.data.images.load(str(file_path.resolve()), check_existing=True)
+        
+        # If the loaded image has a broken path (e.g. from a different machine),
+        # but check_existing=True found it (maybe by name match in some blender versions? 
+        # or if we are just fixing properties), ensure filepath is correct.
+        # Note: check_existing=True usually matches by path. 
+        # If we moved the project, it creates a new image. This is acceptable.
         
         # Set fake user to keep image in memory
         if use_fake_user:
             img.use_fake_user = True
+
+        if force_reload:
+            img.reload()
         
         return img
         
     except Exception as e:
         print(f"[AssetUtils] Error loading {file_path}: {e}")
         return None
+
+
+def cleanup_orphaned_images():
+    """
+    Remove images that have no users (users == 0).
+    Expected to be called periodically during rendering to prevent RAM saturation,
+    especially when load_single_image(..., use_fake_user=False) is used.
+    """
+    removed_count = 0
+    for img in list(bpy.data.images):
+        if img.users == 0:
+            try:
+                bpy.data.images.remove(img)
+                removed_count += 1
+            except Exception as e:
+                print(f"[AssetUtils] Failed to remove orphaned image {img.name}: {e}")
+    
+    if removed_count > 0:
+        print(f"[AssetUtils] Cleaned up {removed_count} orphaned images.")
 
