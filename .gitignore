@@ -20,3 +20,8 @@ assets/*
 # OS
 .DS_Store
 Thumbs.db
+
+# Logs
+*.out
+nohup*.out
+nohup_run_*.out
