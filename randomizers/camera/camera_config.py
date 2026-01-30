@@ -19,8 +19,8 @@ class CameraRandomConfig:
     sensor_width_max: float = 36.0
 
     # Distance factors around the computed minimum distance
-    distance_factor_min: float = 1.0
-    distance_factor_max: float = 2.0
+    distance_factor_min: float = 1.2
+    distance_factor_max: float = 1.2
 
     # Spherical angles (camera on a spherical shell)
     polar_angle_min: float = 0.0
@@ -29,13 +29,14 @@ class CameraRandomConfig:
     azimuth_max: float = 360.0
 
     # Look jitter (simulating imperfect aiming)
-    look_jitter_stddev: float = 0.02
+    look_jitter_stddev: float = 0.0
 
     # Camera roll behaviour
-    roll_mode: CameraRollMode = CameraRollMode.TWENTY_APPROX_UP
+    roll_mode: CameraRollMode = CameraRollMode.TWENTY_EXACT_UP
     roll_stddev_deg: float = 6.0           # small natural camera roll
-    roll_min_deg: float = -180.0            # used when full-roll is enabled
-    roll_max_deg: float = 180.0
+    roll_min_deg: float = -18.0            # used when full-roll is enabled
+    roll_max_deg: float = 18.0
+    roll_enforce_limits_in_approx_up: bool = True # enforce limit min/max in TWENTY_APPROX_UP
 
     # DOF
     board_diameter_m: float = 0.44

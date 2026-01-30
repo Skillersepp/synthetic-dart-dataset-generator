@@ -12,11 +12,11 @@ class DatasetConfig:
     """Configuration for dataset generation."""
     
     # Seed for reproducibility
-    global_seed: int = 0
+    global_seed: int = 1
     
     # Frame range
     start_frame: int = 1
-    end_frame: int = 200000
+    end_frame: int = 300000
     
     # Output paths (relative to project root)
     output_base: str = "output"
@@ -24,8 +24,8 @@ class DatasetConfig:
     # Render settings
     render_engine: str = "EEVEE"  # "CYCLES" or "EEVEE"
     render_samples: int = 8
-    resolution_x: int = 1000
-    resolution_y: int = 1000
+    resolution_x: int = 1024
+    resolution_y: int = 1024
     render_transparent: bool = True  # Transparent background for compositing
     
     @property
