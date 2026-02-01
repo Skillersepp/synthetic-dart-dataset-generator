@@ -1,5 +1,10 @@
 from dataclasses import dataclass, field
 from typing import Optional
+from enum import Enum, auto
+
+class DistributionMode(Enum):
+    UNIFORM = auto()
+    GAUSSIAN = auto()
 
 @dataclass
 class ThrowRandomConfig:
@@ -11,8 +16,16 @@ class ThrowRandomConfig:
     
     # Position randomization (Polar coordinates)
     # Radius in meters
-    max_radius: float = 0.25
+    max_radius: float = 0.17
     
+    # Distribution Mode
+    distribution_mode: DistributionMode = DistributionMode.GAUSSIAN
+    
+    # Gaussian distribution settings (only used if distribution_mode is GAUSSIAN)
+    # Standard deviation in meters
+    gaussian_sigma_min: float = 0.005 
+    gaussian_sigma_max: float = 0.005
+
     # Rotation randomization (in degrees)
     rot_x_min: float = -10.0
     rot_x_max: float = 10.0
@@ -27,4 +40,4 @@ class ThrowRandomConfig:
 
     # Visibility / Bouncer settings
     allow_darts_outside_board: bool = False # If False, darts with radius > 0.225m are hidden
-    bouncer_probability: float = 0.0 # Probability (0.0 to 1.0) that a dart is hidden (simulating a bouncer)
+    bouncer_probability: float = 0.1 # Probability (0.0 to 1.0) that a dart is hidden (simulating a bouncer)
