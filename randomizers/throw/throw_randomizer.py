@@ -4,7 +4,7 @@ from typing import Optional, List
 from mathutils import Vector, Euler
 
 from randomizers.base_randomizer import BaseRandomizer
-from .throw_config import ThrowRandomConfig
+from .throw_config import ThrowRandomConfig, DistributionMode
 from randomizers.dart.dart_randomizer import DartRandomizer
 from randomizers.dart.dart import Dart
 from utils import DartboardLayout
@@ -177,6 +177,21 @@ class ThrowRandomizer(BaseRandomizer):
 
         base_seed = self.rng.randint(0, 1000000)
         
+        # Prepare Gaussian parameters if needed
+        gaussian_params = None
+        if self.config.distribution_mode == DistributionMode.GAUSSIAN:
+            # 1. Pick Target Point (Uniform on disk)
+            t_angle = self.rng.random() * 2 * math.pi
+            # Use square root for uniform area sampling
+            t_radius = math.sqrt(self.rng.random()) * self.config.max_radius
+            t_x = t_radius * math.cos(t_angle)
+            t_y = t_radius * math.sin(t_angle)
+            
+            # 2. Pick Sigma
+            sigma = self.rng.uniform(self.config.gaussian_sigma_min, self.config.gaussian_sigma_max)
+            
+            gaussian_params = (t_x, t_y, sigma)
+
         for i, dart in enumerate(self.spawned_darts):
             if not dart or not dart.root: continue
             
@@ -195,7 +210,7 @@ class ThrowRandomizer(BaseRandomizer):
                 self.dart_randomizer.randomize(dart=dart)
             
             # Randomize Position/Rotation
-            self._randomize_transform(dart)
+            self._randomize_transform(dart, gaussian_params)
             
             # --- Visibility Logic ---
             # Calculate radius from current location (assuming board center is 0,0,0)
@@ -304,13 +319,27 @@ class ThrowRandomizer(BaseRandomizer):
         new_root = copy_recursive(root_obj)
         return new_root
 
-    def _randomize_transform(self, dart) -> None:
+    def _randomize_transform(self, dart, gaussian_params=None) -> None:
         """Apply random position and rotation to a dart."""
         obj = dart.root
         
-        # Position (Polar Coordinates)
-        angle = self.rng.random() * 2 * math.pi
-        radius = self.rng.random() * self.config.max_radius
+        # Position
+        if gaussian_params:
+            target_x, target_y, sigma = gaussian_params
+            # Sample from Gaussian centered at target
+            x = self.rng.gauss(target_x, sigma)
+            y = self.rng.gauss(target_y, sigma)
+            
+            # Convert to polar for validation/scoring
+            radius = math.sqrt(x*x + y*y)
+            angle = math.atan2(y, x)
+            if angle < 0:
+                angle += 2 * math.pi
+        else:
+            # Position (Polar Coordinates) - Uniform
+            angle = self.rng.random() * 2 * math.pi
+            # Use square root to ensure uniform distribution over the area (otherwise points cluster in center)
+            radius = math.sqrt(self.rng.random()) * self.config.max_radius
         
         # Validate radius using DartboardLayout
         radius = self.board_layout.validate_radius(radius)
