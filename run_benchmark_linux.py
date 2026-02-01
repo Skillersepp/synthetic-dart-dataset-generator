@@ -4,7 +4,7 @@ import os
 import sys
 
 # --- KONFIGURATION ---
-NUM_INSTANCES = 4
+NUM_INSTANCES = 6
 PROJECT_DIR = r"/home/student/Schreibtisch/synthetic-dart-dataset-generator"
 BLEND_FILE = "dev_scene.blend"
 PYTHON_SCRIPT = "randomization_test.py"
