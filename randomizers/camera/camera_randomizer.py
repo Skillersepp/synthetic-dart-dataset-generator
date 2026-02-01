@@ -94,6 +94,11 @@ class CameraRandomizer(BaseRandomizer):
             # Align Camera Up with World Y (where "20" is), plus jitter
             up_vector = Vector((0, 1.0, 0.0))
             jitter_deg = self.rng.gauss(0, c.roll_stddev_deg)
+            if c.roll_enforce_limits_in_approx_up:
+                # Re-roll if outside valid range (rejection sampling)
+                while not (c.roll_min_deg <= jitter_deg <= c.roll_max_deg):
+                    jitter_deg = self.rng.gauss(0, c.roll_stddev_deg)
+
             up_vector.rotate(Euler((0.0, 0.0, math.radians(jitter_deg)), 'XYZ'))
             # print(f"Applied roll jitter: {jitter_deg:.2f}°")
             
