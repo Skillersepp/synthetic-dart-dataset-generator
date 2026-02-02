@@ -26,7 +26,7 @@ class DatasetConfig:
     render_samples: int = 8
     resolution_x: int = 1024
     resolution_y: int = 1024
-    render_transparent: bool = True  # Transparent background for compositing
+    render_transparent: bool = False  # Transparent background for compositing
     
     @property
     def dataset_name(self) -> str:
