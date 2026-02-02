@@ -195,6 +195,9 @@ class ThrowRandomizer(BaseRandomizer):
         # set all darts invisible so we can enable them one by one
         for dart in self.spawned_darts:
             dart.set_visibility(False)
+        
+        # Keep track of active dart positions for collision checks
+        active_dart_locations = []
 
         for i, dart in enumerate(self.spawned_darts):
             if not dart or not dart.root: continue
@@ -206,11 +209,22 @@ class ThrowRandomizer(BaseRandomizer):
             self._randomize_appearance(dart, base_seed + i)
             
             # Randomize Position/Rotation
-            self._randomize_position(dart, gaussian_params)
+            # We pass active_dart_locations to check for collisions
+            is_valid_pos = self._randomize_position(dart, gaussian_params, active_dart_locations)
+            
+            # If unable to find valid split (too crowded), handle as bouncer
+            if not is_valid_pos:
+                dart.set_visibility(False)
+                continue
             
             # Handle Visibility (outside board, bouncers)
             if not self._handle_visibility(dart):
+                # If it became invisible, we don't add it to active locations
                 continue
+            
+            # Use current location as confirmed active location
+            current_pos = dart.root.location.copy()
+            active_dart_locations.append(current_pos)
 
             # Randomize Empedding Depth
             self._randomize_embedding_depth(dart)
@@ -228,7 +242,7 @@ class ThrowRandomizer(BaseRandomizer):
                 # Move Dart INTO the board
                 # Calculate translation vector in local space
                 embed_depth = dart.embed_tip_length / 1000  # convert mm to m
-                local_translation = Vector((0, 0, -embed_depth))
+                local_translation = Vector((0, 0, -embed_depth)) # Local Z is usually 'up' for darts, check model
                 
                 # Apply to world location
                 # location += rotation @ local_translation
@@ -285,51 +299,86 @@ class ThrowRandomizer(BaseRandomizer):
         new_root = copy_recursive(root_obj)
         return new_root
 
-    def _randomize_position(self, dart, gaussian_params=None) -> None:
-        """Apply random position to a dart."""
+    def _randomize_position(self, dart, gaussian_params=None, active_locations=None) -> bool:
+        """
+        Apply random position to a dart.
+        Tries to find a valid position that is not colliding with active_locations.
+        Returns check result (True if valid position found, False if gave up/bouncer).
+        """
         obj = dart.root
         
-        # Position
-        if gaussian_params:
-            target_x, target_y, sigma = gaussian_params
-            # Sample from Gaussian centered at target
-            x = self.rng.gauss(target_x, sigma)
-            y = self.rng.gauss(target_y, sigma)
+        MAX_ATTEMPTS = 50
+        MIN_TIP_DISTANCE = 0.0022 # 2mm separation
+        tip_r = MIN_TIP_DISTANCE # collision threshold
+        
+        valid_pos_found = False
+        final_x, final_y, final_z = 0, 0, 0
+        final_radius, final_angle = 0, 0
+        
+        for attempt in range(MAX_ATTEMPTS):
+            # 1. Choose Random Position
+            if gaussian_params:
+                target_x, target_y, sigma = gaussian_params
+                x = self.rng.gauss(target_x, sigma)
+                y = self.rng.gauss(target_y, sigma)
+                # Convert to polar for validation
+                radius = math.sqrt(x*x + y*y)
+                angle = math.atan2(y, x)
+                if angle < 0: angle += 2 * math.pi
+            else:
+                angle = self.rng.random() * 2 * math.pi
+                radius = math.sqrt(self.rng.random()) * self.config.max_radius
+                
+            # 2. Validate Wire (Snap to safe zone)
+            radius = self.board_layout.validate_radius(radius)
+            angle = self.board_layout.validate_angle(radius, angle)
             
-            # Convert to polar for validation/scoring
-            radius = math.sqrt(x*x + y*y)
-            angle = math.atan2(y, x)
-            if angle < 0:
-                angle += 2 * math.pi
-        else:
-            # Position (Polar Coordinates) - Uniform
-            angle = self.rng.random() * 2 * math.pi
-            # Use square root to ensure uniform distribution over the area (otherwise points cluster in center)
-            radius = math.sqrt(self.rng.random()) * self.config.max_radius
+            # Convert back to Cartesian
+            x = radius * math.cos(angle)
+            y = radius * math.sin(angle)
+            z = 0
+            
+            # 3. Check proximity to active darts
+            is_too_close = False
+            if active_locations:
+                current_vec = Vector((x, y, z))
+                for existing_pos in active_locations:
+                    dist = (current_vec - existing_pos).length
+                    if dist < tip_r: # e.g. 2*tip_radius logic
+                        is_too_close = True
+                        break
+            
+            if not is_too_close:
+                final_x, final_y, final_z = x, y, z
+                final_radius, final_angle = radius, angle
+                valid_pos_found = True
+                # DEBUG
+                #if attempt > 0:
+                #    print(f"valid pos found after {attempt} attempts")
+                break
         
-        # Validate radius using DartboardLayout
-        radius = self.board_layout.validate_radius(radius)
-        
-        # Validate angle using DartboardLayout
-        angle = self.board_layout.validate_angle(radius, angle)
-        
+        # If loop finished without success, it's a bouncer (invalid pos)
+        if not valid_pos_found:
+            # DEBUG
+            #print("bouncer")
+            return False
+
+        # Apply valid position
         # Store polar coordinates and score in the Dart object for annotation
-        dart.polar_radius = radius
-        dart.polar_angle = angle
-        dart.score = self.board_layout.get_score_from_polar(radius, angle)
-        
-        x = radius * math.cos(angle)
-        y = radius * math.sin(angle)
-        z = 0 # Assuming board plane is at Z=0
+        dart.polar_radius = final_radius
+        dart.polar_angle = final_angle
+        dart.score = self.board_layout.get_score_from_polar(final_radius, final_angle)
         
         # Debug
         # print(f"[ThrowRandomizer] {obj.name}: Radius={radius:.4f}, Angle={angle:.4f} -> ({x:.4f}, {y:.4f}, {z:.4f})")
         
-        obj.location = Vector((x, y, z))
+        obj.location = Vector((final_x, final_y, final_z))
         
         # Debug: Check if location assignment worked (constraints might override it)
-        if (obj.location - Vector((x, y, z))).length > 0.001:
-             print(f"[ThrowRandomizer] Warning: Location assignment failed for {obj.name}! Wanted {Vector((x,y,z))}, got {obj.location}. Check for constraints.")
+        if (obj.location - Vector((final_x, final_y, final_z))).length > 0.001:
+             print(f"[ThrowRandomizer] Warning: Location assignment failed for {obj.name}! Wanted {Vector((final_x, final_y, final_z))}, got {obj.location}. Check for constraints.")
+
+        return True
 
     def _randomize_rotation(self, dart) -> None:
         """Apply random rotation to a dart."""
