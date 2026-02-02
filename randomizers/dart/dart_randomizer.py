@@ -22,19 +22,21 @@ class DartRandomizer(BaseRandomizer):
     def __init__(self, seed: int, config: Optional[DartRandomConfig] = None, base_path: Path = None):
         # Note: base_path is kept for backwards compatibility but asset_utils uses
         # the globally set base path from SceneRandomizer initialization
-        self._flight_texture_paths_flags: List[Path] = []
-        self._flight_texture_paths_outpainted: List[Path] = []
+        self._flight_texture_paths: List[Path] = []
         super().__init__(seed, config or DartRandomConfig())
 
     def _initialize(self) -> None:
         """Scan flight texture paths (fast, no image loading)."""
-        self._flight_texture_paths_flags = get_texture_paths(
-            self.config.flight_textures_flags_folder
-        )
-        self._flight_texture_paths_outpainted = get_texture_paths(
-            self.config.flight_textures_outpainted_folder
-        )
-        print(f"[DartRandomizer] Found {len(self._flight_texture_paths_flags)} flags + {len(self._flight_texture_paths_outpainted)} outpainted texture paths")
+        self._flight_texture_paths = []
+        for folder in self.config.flight_texture_folders:
+            paths = get_texture_paths(folder, recursive=True)
+            self._flight_texture_paths.extend(paths)
+        
+        # Remove duplicates if folders overlap (though get_texture_paths handles duplicates within one call, 
+        # combining multiple calls might need a set check if desired, but here we just extend)
+        # We can do a quick unique pass if needed, but asset_utils loads absolute paths so it should be fine.
+        
+        print(f"[DartRandomizer] Found {len(self._flight_texture_paths)} total flight texture paths")
 
     def setup_geometry_references(self, dart: Dart) -> None:
         """
@@ -209,10 +211,9 @@ class DartRandomizer(BaseRandomizer):
         self._ensure_unique_node_group(group_node)
 
         # 3. Determine Mode
-        # Modes: 0=Flags, 1=Outpainted, 2=Gradient, 3=Solid
+        # Modes: 0=Texture, 1=Gradient, 2=Solid
         probs = [
-            self.config.prob_flight_texture_flags,
-            self.config.prob_flight_texture_outpainted,
+            self.config.prob_flight_texture,
             self.config.prob_flight_gradient,
             self.config.prob_flight_solid
         ]
@@ -222,21 +223,16 @@ class DartRandomizer(BaseRandomizer):
         if total_prob > 0:
             probs = [p / total_prob for p in probs]
         else:
-            probs = [0.25, 0.25, 0.25, 0.25] # Fallback equal distribution
+            probs = [0.8, 0.1, 0.1] # Fallback
 
-        mode = self.rng.choices(range(4), weights=probs, k=1)[0]
+        mode = self.rng.choices(range(3), weights=probs, k=1)[0]
 
-        if mode == 0: # Flags
-            self._set_flight_texture(group_node, self._flight_texture_paths_flags)
+        if mode == 0: # Texture
+            self._set_flight_texture(group_node, self._flight_texture_paths)
             set_node_input(group_node, "Mix_factor_1", 0.0)
             set_node_input(group_node, "Mix_factor_2", 0.0)
             
-        elif mode == 1: # Outpainted
-            self._set_flight_texture(group_node, self._flight_texture_paths_outpainted)
-            set_node_input(group_node, "Mix_factor_1", 0.0)
-            set_node_input(group_node, "Mix_factor_2", 0.0)
-            
-        elif mode == 2: # Gradient
+        elif mode == 1: # Gradient
             col1 = self._get_random_color()
             col2 = self._get_random_color()
             set_node_input(group_node, "Gradient_color_1", col1)
@@ -244,7 +240,7 @@ class DartRandomizer(BaseRandomizer):
             set_node_input(group_node, "Mix_factor_1", 1.0)
             set_node_input(group_node, "Mix_factor_2", 0.0)
             
-        elif mode == 3: # Solid
+        elif mode == 2: # Solid
             col = self._get_random_color()
             set_node_input(group_node, "Solid_color", col)
             # Mix_factor_1 can be anything, Mix_factor_2 must be 1.0

@@ -193,7 +193,7 @@ class SceneRandomizer(BaseRandomizer):
             return
 
         tex_path = self.rng.choice(self._background_texture_paths)
-        image = load_single_image(tex_path)
+        image = load_single_image(tex_path, use_fake_user=False)
         
         if not image:
             return

@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List
 
 @dataclass
 class RangeOrFixed:
@@ -24,8 +24,11 @@ class DartRandomConfig:
     # -----------------------------------------------------------------
     # Asset paths (relative to project root)
     # -----------------------------------------------------------------
-    flight_textures_flags_folder: str = "assets/textures/dart/flight/flags"
-    flight_textures_outpainted_folder: str = "assets/textures/dart/flight/outpainted"
+    flight_texture_folders: List[str] = field(default_factory=lambda: [
+        "assets/textures/dart/flight/flags", 
+        "assets/textures/dart/flight/outpainted",
+        "assets/textures/background"
+    ])
     
     # -----------------------------------------------------------------
     # Tip Generator
@@ -48,8 +51,7 @@ class DartRandomConfig:
     fixed_flight_index: int = 100
 
     # Flight Material
-    prob_flight_texture_flags: float = 0.3
-    prob_flight_texture_outpainted: float = 0.5
+    prob_flight_texture: float = 0.8  # Probability for any texture (from loaded folders)
     prob_flight_gradient: float = 0.1
     prob_flight_solid: float = 0.1
     

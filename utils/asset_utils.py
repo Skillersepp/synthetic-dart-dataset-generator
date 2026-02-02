@@ -175,7 +175,7 @@ def get_texture_paths(
 def load_single_image(
     file_path: str | Path,
     force_reload: bool = False,
-    use_fake_user: bool = True
+    use_fake_user: bool = False
 ) -> Optional[bpy.types.Image]:
     """
     Load a single image into Blender's data.
