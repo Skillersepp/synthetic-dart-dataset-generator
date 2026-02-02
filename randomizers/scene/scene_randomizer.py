@@ -22,6 +22,7 @@ class SceneRandomizer(BaseRandomizer):
         if base_path:
             set_base_path(base_path)
         self._hdri_paths: List[Path] = []
+        self._background_texture_paths: List[Path] = []
         super().__init__(seed, config)
 
     # ---------------------------------------------------------------------
@@ -35,6 +36,12 @@ class SceneRandomizer(BaseRandomizer):
             extensions=['.exr', '.hdr']
         )
         print(f"[SceneRandomizer] Found {len(self._hdri_paths)} HDRI paths")
+
+        self._background_texture_paths = get_texture_paths(
+            self.config.background_texture_folder,
+            recursive=True
+        )
+        print(f"[SceneRandomizer] Found {len(self._background_texture_paths)} background texture paths")
         
         if bpy.context.scene:
             self._ensure_hdri_node_setup(bpy.context.scene)
@@ -101,8 +108,10 @@ class SceneRandomizer(BaseRandomizer):
         - HDRI environment texture
         - HDRI strength
         - HDRI rotation
+        - Background Plane
         """
         self._randomize_hdri(scene)
+        self._randomize_background_plane(scene)
 
     # ---------------------------------------------------------------------
     # INTERNAL METHODS
@@ -154,4 +163,85 @@ class SceneRandomizer(BaseRandomizer):
         background.inputs["Strength"].default_value = strength
 
         # print(f"Applied HDRI: {image_name}, rot={rotation_z:.2f}, str={strength:.2f}")
+
+    def _randomize_background_plane(self, scene: bpy.types.Scene) -> None:
+        """
+        Randomize the visibility, texture, and mapping of the Background_Plane.
+        """
+        bg_plane = scene.objects.get("Background_Plane")
+        if not bg_plane:
+            return
+
+        # 1. Determine Visibility
+        is_visible = False
+        if self.config.background_plane_enabled:
+            # Check probability
+            if self.rng.random() <= self.config.background_plane_probability:
+                is_visible = True
+        
+        # Apply visibility
+        bg_plane.hide_render = not is_visible
+        bg_plane.hide_viewport = not is_visible
+        
+        # If not visible, we don't need to load textures or randomize mapping
+        if not is_visible:
+            return
+
+        # 2. Randomize Texture
+        if not self._background_texture_paths:
+            print("[SceneRandomizer] Warning: Background Plane enabled but no textures found.")
+            return
+
+        tex_path = self.rng.choice(self._background_texture_paths)
+        image = load_single_image(tex_path)
+        
+        if not image:
+            return
+
+        # Assign image to material
+        # Assuming material name is "Background_Plane"
+        mat = bg_plane.data.materials.get("Background_Plane")
+        if not mat or not mat.use_nodes:
+            print("[SceneRandomizer] Warning: Background_Plane material not found or does not use nodes.")
+            return
+            
+        nodes = mat.node_tree.nodes
+        
+        # Find Image Texture Node
+        img_node = None
+        for node in nodes:
+            if node.type == 'TEX_IMAGE':
+                img_node = node
+                break
+        
+        if img_node:
+            img_node.image = image
+        else:
+            print("[SceneRandomizer] Warning: No Image Texture node found in Background_Plane material.")
+
+        # 3. Randomize Mapping
+        mapping_node = None
+        for node in nodes:
+            if node.type == 'MAPPING':
+                mapping_node = node
+                break
+        
+        if mapping_node:
+            # Location
+            loc_x = self.rng.uniform(self.config.bg_location_min[0], self.config.bg_location_max[0])
+            loc_y = self.rng.uniform(self.config.bg_location_min[1], self.config.bg_location_max[1])
+            loc_z = self.rng.uniform(self.config.bg_location_min[2], self.config.bg_location_max[2])
+            mapping_node.inputs["Location"].default_value = (loc_x, loc_y, loc_z)
+
+            # Rotation (Euler)
+            rot_x = self.rng.uniform(self.config.bg_rotation_min[0], self.config.bg_rotation_max[0])
+            rot_y = self.rng.uniform(self.config.bg_rotation_min[1], self.config.bg_rotation_max[1])
+            rot_z = self.rng.uniform(self.config.bg_rotation_min[2], self.config.bg_rotation_max[2])
+            mapping_node.inputs["Rotation"].default_value = (rot_x, rot_y, rot_z)
+
+            # Scale
+            scale_x = self.rng.uniform(self.config.bg_scale_min[0], self.config.bg_scale_max[0])
+            scale_y = self.rng.uniform(self.config.bg_scale_min[1], self.config.bg_scale_max[1])
+            scale_z = self.rng.uniform(self.config.bg_scale_min[2], self.config.bg_scale_max[2])
+            mapping_node.inputs["Scale"].default_value = (scale_x, scale_y, scale_z)
 
