@@ -27,6 +27,7 @@ class Dart:
         self.tip_length: float = 0.0
         self.barrel_length: float = 0.0
         self.shaft_length: float = 0.0
+        self.embed_tip_length: float = 0.0
         self.flight_insertion_depth: float = 0.0
         self.flight_index: int = 0
         self.is_visible: bool = True
