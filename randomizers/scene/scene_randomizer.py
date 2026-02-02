@@ -242,6 +242,5 @@ class SceneRandomizer(BaseRandomizer):
             # Scale
             scale_x = self.rng.uniform(self.config.bg_scale_min[0], self.config.bg_scale_max[0])
             scale_y = self.rng.uniform(self.config.bg_scale_min[1], self.config.bg_scale_max[1])
-            scale_z = self.rng.uniform(self.config.bg_scale_min[2], self.config.bg_scale_max[2])
-            mapping_node.inputs["Scale"].default_value = (scale_x, scale_y, scale_z)
+            mapping_node.inputs["Scale"].default_value = (scale_x, scale_y, 1.0)
 

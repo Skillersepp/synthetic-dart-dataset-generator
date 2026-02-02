@@ -28,4 +28,4 @@ class SceneRandomConfig:
     
     # Scale
     bg_scale_min: tuple = (0.8, 0.8, 1.0)
-    bg_scale_max: tuple = (1.2, 1.2, 1.0)
+    bg_scale_max: tuple = (6, 6, 1.0)
