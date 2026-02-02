@@ -192,77 +192,43 @@ class ThrowRandomizer(BaseRandomizer):
             
             gaussian_params = (t_x, t_y, sigma)
 
+        # set all darts invisible so we can enable them one by one
+        for dart in self.spawned_darts:
+            dart.set_visibility(False)
+
         for i, dart in enumerate(self.spawned_darts):
             if not dart or not dart.root: continue
             
-            # Reset visibility (in case it was hidden in previous frame)
+            # set dart visible
             dart.set_visibility(True)
             
             # Randomize Appearance
-            if self.dart_randomizer:
-                # Determine seed for this dart
-                if self.config.same_appearance:
-                    dart_seed = base_seed
-                else:
-                    dart_seed = self.rng.randint(0, 1000000)
-                
-                self.dart_randomizer.update_seed(dart_seed)
-                self.dart_randomizer.randomize(dart=dart)
+            self._randomize_appearance(dart, base_seed + i)
             
             # Randomize Position/Rotation
-            self._randomize_transform(dart, gaussian_params)
+            self._randomize_position(dart, gaussian_params)
             
-            # --- Visibility Logic ---
-            # Calculate radius from current location (assuming board center is 0,0,0)
-            current_radius = dart.root.location.xy.length
-            
-            should_hide = False
-            
-            # Rule 1: Outside board
-            if current_radius > 0.225 and not self.config.allow_darts_outside_board:
-                should_hide = True
-                # print(f"[ThrowRandomizer] Hiding {dart.root.name}: Radius {current_radius:.4f} > 0.225m")
-                
-            # Rule 2: Bouncer (only if not already hidden)
-            if not should_hide and self.config.bouncer_probability > 0:
-                if self.rng.random() < self.config.bouncer_probability:
-                    should_hide = True
-                    # print(f"[ThrowRandomizer] Hiding {dart.root.name}: Bouncer (Prob: {self.config.bouncer_probability})")
-                    
-            if should_hide:
-                dart.set_visibility(False)
-            
+            # Handle Visibility (outside board, bouncers)
+            if not self._handle_visibility(dart):
+                continue
+
+            # Randomize Empedding Depth
+            self._randomize_embedding_depth(dart)
+
+            self._randomize_rotation(dart)
+
+
             # Handle K-Point and Embedding
             if dart.k_point:
                 k_point = dart.k_point
-                # 1. Move K-Point to Dart's surface position
-                # IMPORTANT: We must copy the vector, otherwise it's a reference!
-                # But assigning vector to vector property in Blender usually copies values.
-                # Let's be explicit to be safe.
+                # Set K-Point to Dart location/rotation
                 k_point.location = dart.root.location.copy()
                 k_point.rotation_euler = dart.root.rotation_euler.copy()
                 
-                # 2. Calculate Embedding Depth
-                # Get tip length from the dart instance (cached!)
-                # Value is in mm (from config/GeoNodes), convert to meters for world space transform
-                tip_length_mm = dart.tip_length
-                
-                # If reading failed (shouldn't happen if randomized), fallback
-                if tip_length_mm == 0.0:
-                    tip_length_mm = 30.0 # Fallback 30mm
-                
-                tip_length_m = tip_length_mm / 1000.0
-                
-                embed_factor = self.rng.uniform(self.config.embed_depth_factor_min, self.config.embed_depth_factor_max)
-                embed_depth_m = tip_length_m * embed_factor
-                
-                # 3. Move Dart INTO the board
-                # Assuming Dart points in local Z direction (or whatever direction the arrow points)
-                # If arrow points AWAY from board, then +Z is AWAY.
-                # To move INTO board, we need to move in -Z direction.
-                
+                # Move Dart INTO the board
                 # Calculate translation vector in local space
-                local_translation = Vector((0, 0, -embed_depth_m))
+                embed_depth = dart.embed_tip_length / 1000  # convert mm to m
+                local_translation = Vector((0, 0, -embed_depth))
                 
                 # Apply to world location
                 # location += rotation @ local_translation
@@ -319,8 +285,8 @@ class ThrowRandomizer(BaseRandomizer):
         new_root = copy_recursive(root_obj)
         return new_root
 
-    def _randomize_transform(self, dart, gaussian_params=None) -> None:
-        """Apply random position and rotation to a dart."""
+    def _randomize_position(self, dart, gaussian_params=None) -> None:
+        """Apply random position to a dart."""
         obj = dart.root
         
         # Position
@@ -365,9 +331,57 @@ class ThrowRandomizer(BaseRandomizer):
         if (obj.location - Vector((x, y, z))).length > 0.001:
              print(f"[ThrowRandomizer] Warning: Location assignment failed for {obj.name}! Wanted {Vector((x,y,z))}, got {obj.location}. Check for constraints.")
 
+    def _randomize_rotation(self, dart) -> None:
+        """Apply random rotation to a dart."""
+        obj = dart.root
+
         # Rotation
         rx = math.radians(self.config.rot_x_min + self.rng.random() * (self.config.rot_x_max - self.config.rot_x_min))
         ry = math.radians(self.config.rot_y_min + self.rng.random() * (self.config.rot_y_max - self.config.rot_y_min))
         rz = math.radians(self.config.rot_z_min + self.rng.random() * (self.config.rot_z_max - self.config.rot_z_min))
         
         obj.rotation_euler = Euler((rx, ry, rz), 'XYZ')
+
+    def _handle_visibility(self, dart) -> bool:
+        """Handle visibility based on config (outside board, bouncers)."""
+        
+        # Calculate radius from current location (assuming board center is 0,0,0)
+        current_radius = dart.root.location.xy.length
+        
+        # Rule 1: Outside board
+        if current_radius > 0.225 and not self.config.allow_darts_outside_board:
+            dart.set_visibility(False)
+            # print(f"[ThrowRandomizer] Hiding {dart.root.name}: Radius {current_radius:.4f} > 0.225m")
+            return False
+            
+        # Rule 2: Bouncer (only if not already hidden)
+        if self.rng.random() < self.config.bouncer_probability:
+            dart.set_visibility(False)
+            # print(f"[ThrowRandomizer] Hiding {dart.root.name}: Bouncer (Prob: {self.config.bouncer_probability})")
+            return False
+        
+        # Otherwise keep visible
+        dart.set_visibility(True)
+        return True
+
+    def _randomize_appearance(self, dart: Dart, seed: int) -> None:
+        """Delegate appearance randomization to DartRandomizer."""
+        if self.dart_randomizer:
+            # Determine seed for this dart
+            if self.config.same_appearance:
+                dart_seed = seed
+            else:
+                dart_seed = self.rng.randint(0, 1000000)
+            
+            self.dart_randomizer.update_seed(dart_seed)
+            self.dart_randomizer.randomize(dart=dart) 
+
+    def _randomize_embedding_depth(self, dart: Dart) -> None:
+        """Randomize embedding depth of the dart into the board."""
+        tip_length = dart.tip_length if dart.tip_length > 0 else 0.03 # Fallback to 3cm if unknown
+        
+        factor = self.rng.uniform(self.config.embed_depth_factor_min, self.config.embed_depth_factor_max)
+        embed_depth_m = tip_length * factor
+        
+        # Store for later use in K-Point adjustment
+        dart.embed_tip_length = embed_depth_m
