@@ -117,7 +117,8 @@ def repair_all_image_paths() -> int:
 
 def get_texture_paths(
     folder_path: str | Path,
-    extensions: Optional[List[str]] = None
+    extensions: Optional[List[str]] = None,
+    recursive: bool = False
 ) -> List[Path]:
     """
     Get all texture file paths from a folder WITHOUT loading them into Blender.
@@ -129,6 +130,7 @@ def get_texture_paths(
     Args:
         folder_path: Relative path to texture folder (e.g. "assets/textures/dart/flight")
         extensions: List of file extensions to include (default: common image formats)
+        recursive: Whether to search recursively in subfolders
         
     Returns:
         Sorted list of absolute Path objects to texture files
@@ -147,9 +149,17 @@ def get_texture_paths(
     
     # Find all image files
     image_files = []
-    for ext in extensions:
-        image_files.extend(abs_path.glob(f"*{ext}"))
-        image_files.extend(abs_path.glob(f"*{ext.upper()}"))
+    
+    if recursive:
+        # Use rglob for recursive search
+        # Note: rglob does not support multiple extensions directly like glob lists so we iterate
+        for ext in extensions:
+             image_files.extend(abs_path.rglob(f"*{ext}"))
+             image_files.extend(abs_path.rglob(f"*{ext.upper()}"))
+    else:
+        for ext in extensions:
+            image_files.extend(abs_path.glob(f"*{ext}"))
+            image_files.extend(abs_path.glob(f"*{ext.upper()}"))
     
     # Remove duplicates (case-insensitive systems might find same file twice)
     seen: Set[str] = set()
