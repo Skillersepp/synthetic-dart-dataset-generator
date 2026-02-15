@@ -174,7 +174,10 @@ class SceneRandomizer(BaseRandomizer):
 
         # 1. Determine Visibility
         is_visible = False
-        if self.config.background_plane_enabled:
+        
+        # Only consider showing the plane if background is NOT compatible with transparency
+        # If film_transparent is True, we generally don't want a background plane blocking the alpha.
+        if self.config.background_plane_enabled and not scene.render.film_transparent:
             # Check probability
             if self.rng.random() <= self.config.background_plane_probability:
                 is_visible = True
