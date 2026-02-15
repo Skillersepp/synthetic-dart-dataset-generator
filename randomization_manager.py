@@ -68,9 +68,10 @@ class RandomizationManager:
     def _make_seed(self, tag: str, index: int) -> int:
         """Deterministic sub-seed generation."""
         data = f"{self.global_seed}_{tag}_{index}".encode('utf-8')
-        digest = hashlib.md5(data).hexdigest()
+        digest = hashlib.md5(data, usedforsecurity=False).hexdigest()
         # Convert hex digest to int and keep it within a reasonable range (32-bit)
-        return int(digest, 16) % (2**32)
+        seed = int(digest, 16) % (2**32)
+        return seed
 
     def randomize(self, image_index: int, camera, scene):
         """
