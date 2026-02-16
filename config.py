@@ -12,7 +12,7 @@ class DatasetConfig:
     """Configuration for dataset generation."""
     
     # Seed for reproducibility
-    global_seed: int = 1
+    global_seed: int = 0
     
     # Frame range
     start_frame: int = 1
@@ -22,11 +22,11 @@ class DatasetConfig:
     output_base: str = "output"
     
     # Render settings
-    render_engine: str = "EEVEE"  # "CYCLES" or "EEVEE"
+    render_engine: str = "EEVEE"  # "CYCLES" or "EEVEE" ("BLENDER_EEVEE_NEXT")
     render_samples: int = 8
     resolution_x: int = 1024
     resolution_y: int = 1024
-    render_transparent: bool = False  # Transparent background for compositing
+    render_transparent: bool = True  # Transparent background for compositing
     
     @property
     def dataset_name(self) -> str:
