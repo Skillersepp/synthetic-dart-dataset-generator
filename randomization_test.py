@@ -16,32 +16,32 @@ import bpy
 DEV_RELOAD = True  # Set to False for production / faster execution
 
 PROJECT_MODULES = [
-    "config",
-    "utils",
-    "utils.asset_utils",
-    "utils.math_utils",
-    "utils.camera_utils",
-    "utils.node_utils",
-    "utils.color_utils",
-    "utils.dartboard_layout",
+	"config",
+	"utils",
+	"utils.asset_utils",
+	"utils.math_utils",
+	"utils.camera_utils",
+	"utils.node_utils",
+	"utils.color_utils",
+	"utils.dartboard_layout",
 	"utils.annotation_manager",
-    "randomizers.base_randomizer",
-    "randomizers.camera.camera_config",
-    "randomizers.camera.camera_randomizer",
-    "randomizers.camera",
-    "randomizers.scene.scene_config",
-    "randomizers.scene.scene_randomizer",
-    "randomizers.scene",
-    "randomizers.dartboard.dartboard_config",
-    "randomizers.dartboard.dartboard_randomizer",
-    "randomizers.dartboard",
-    "randomizers.dart.dart_config",
-    "randomizers.dart.dart_randomizer",
-    "randomizers.dart",
-    "randomizers.throw.throw_config",
-    "randomizers.throw.throw_randomizer",
-    "randomizers.throw",
-    "randomization_manager",
+	"randomizers.base_randomizer",
+	"randomizers.camera.camera_config",
+	"randomizers.camera.camera_randomizer",
+	"randomizers.camera",
+	"randomizers.scene.scene_config",
+	"randomizers.scene.scene_randomizer",
+	"randomizers.scene",
+	"randomizers.dartboard.dartboard_config",
+	"randomizers.dartboard.dartboard_randomizer",
+	"randomizers.dartboard",
+	"randomizers.dart.dart_config",
+	"randomizers.dart.dart_randomizer",
+	"randomizers.dart",
+	"randomizers.throw.throw_config",
+	"randomizers.throw.throw_randomizer",
+	"randomizers.throw",
+	"randomization_manager",
 ]
 
 def _dev_hot_reload():
@@ -65,7 +65,7 @@ _dev_hot_reload()
 
 
 from config import DatasetConfig
-from utils.dataset_utils import setup_output_paths, setup_blender_render_path
+from utils.dataset_utils import setup_output_paths, setup_blender_render_path, save_config_json
 from utils.asset_utils import cleanup_orphaned_images
 from randomization_manager import RandomizationManager
 from bpy.app.handlers import persistent
@@ -77,6 +77,61 @@ config = DatasetConfig()
 bpy.context.scene.frame_start = config.start_frame
 bpy.context.scene.frame_end = config.end_frame
 
+# === Apply Render Settings from Config ===
+bpy.context.scene.render.resolution_x = config.resolution_x
+bpy.context.scene.render.resolution_y = config.resolution_y
+bpy.context.scene.render.film_transparent = config.render_transparent
+
+# Handle Samples based on Engine
+if config.render_engine == 'CYCLES':
+	bpy.context.scene.render.engine = 'CYCLES'
+	bpy.context.scene.cycles.samples = config.render_samples
+
+	# Enable GPU for Cycles
+	try:
+		cycles_prefs = bpy.context.preferences.addons['cycles'].preferences
+		cycles_prefs.refresh_devices()
+			
+		# Try compute devices in order of preference
+		device_types = ['OPTIX', 'CUDA', 'HIP', 'METAL', 'ONEAPI']
+		found_device = False
+		
+		for device_type in device_types:
+			try:
+				# get_devices_for_type might fail on older Blender versions if type not supported
+				devices = cycles_prefs.get_devices_for_type(compute_device_type=device_type)
+				if devices:
+					print(f"[Render] Devices found for {device_type}:")
+					for d in devices:
+						print(f"[Render]   -> name={d.name}, type={d.type}, use={d.use}")
+					cycles_prefs.compute_device_type = device_type
+					for device in devices:
+						device.use = True
+					found_device = True
+					print(f"[Render] Using GPU Device Type: {device_type}")
+					break
+			except:
+				continue
+		
+		if found_device:
+			bpy.context.scene.cycles.device = 'GPU'
+		else:
+			bpy.context.scene.cycles.device = 'CPU'
+			print("[Render] No compatible GPU found. Falling back to CPU.")
+		print(f"[Render] cycles.device = {bpy.context.scene.cycles.device}")
+	except Exception as e:
+		print(f"[Render] Error configuring Cycles GPU: {e}. Falling back to CPU.")
+		bpy.context.scene.cycles.device = 'CPU'
+
+elif config.render_engine in ['BLENDER_EEVEE', 'BLENDER_EEVEE_NEXT', 'EEVEE']:
+	bpy.context.scene.render.engine = 'BLENDER_EEVEE_NEXT'
+	# Try setting for EEVEE (property names vary by version)
+	if hasattr(bpy.context.scene, 'eevee'):
+		if hasattr(bpy.context.scene.eevee, 'taa_render_samples'):
+			 bpy.context.scene.eevee.taa_render_samples = config.render_samples
+
+print(f"[Config] Applied Render Settings: Engine={config.render_engine}, Res={config.resolution_x}x{config.resolution_y}, Samples={config.render_samples}")
+
 # Paths will be set up when rendering starts
 images_path = None
 labels_path = None
@@ -85,35 +140,49 @@ _render_initialized = False
 _original_undo_state = True
 
 def _initialize_for_render():
-    """Initialize output paths and manager when rendering starts."""
-    global images_path, labels_path, manager, _render_initialized
-    
-    if _render_initialized:
-        return
-    
-    # Setup output directories (creates folders)
-    images_path, labels_path = setup_output_paths(PROJECT_ROOT, config)
-    
-    # Configure Blender render output with dynamic frame digits
-    setup_blender_render_path(images_path, config.render_transparent, config.frame_digits)
-    
-    # Initialize manager with paths
-    manager = RandomizationManager(
-        global_seed=config.global_seed,
-        base_path=PROJECT_ROOT,
-        labels_path=labels_path,
-        frame_digits=config.frame_digits
-    )
-    
-    _render_initialized = True
-    print("[Init] Render initialization complete.")
+	"""Initialize output paths and manager when rendering starts."""
+	global images_path, labels_path, manager, _render_initialized
+	
+	if _render_initialized:
+		return
+	
+	# Setup output directories (creates folders)
+	images_path, labels_path = setup_output_paths(PROJECT_ROOT, config)
+	
+	# Configure Blender render output with dynamic frame digits
+	setup_blender_render_path(images_path, config.render_transparent, config.frame_digits)
+	
+	# Initialize manager with paths
+	manager = RandomizationManager(
+		global_seed=config.global_seed,
+		base_path=PROJECT_ROOT,
+		labels_path=labels_path,
+		frame_digits=config.frame_digits
+	)
+	
+	# Save all config settings to JSON for reproducibility
+	dataset_dir = images_path.parent  # <base>/output/dataset_<seed>/
+	save_config_json(
+		dataset_dir=dataset_dir,
+		dataset_config=config,
+		configs={
+			"camera": manager.camera_randomizer.config,
+			"dart": manager.dart_randomizer.config,
+			"dartboard": manager.dartboard_randomizer.config,
+			"scene": manager.scene_randomizer.config,
+			"throw": manager.throw_randomizer.config,
+		},
+	)
+	
+	_render_initialized = True
+	print("[Init] Render initialization complete.")
 
 # Initialize manager for viewport preview (without creating folders)
 preview_manager = RandomizationManager(
-    global_seed=config.global_seed,
-    base_path=PROJECT_ROOT,
-    labels_path=PROJECT_ROOT / config.output_base / config.dataset_name / "labels",  # Not created yet
-    frame_digits=config.frame_digits
+	global_seed=config.global_seed,
+	base_path=PROJECT_ROOT,
+	labels_path=PROJECT_ROOT / config.output_base / config.dataset_name / "labels",  # Not created yet
+	frame_digits=config.frame_digits
 )
 bpy.context.scene.render.use_lock_interface = True  # Lock UI during rendering
 
@@ -214,19 +283,19 @@ def on_render_cancel(scene):
 # Register event handlers
 # Clear old handlers
 for h in [h for h in bpy.app.handlers.frame_change_pre if h.__name__ in ("on_frame_change_pre", "on_frame_change")]:
-    bpy.app.handlers.frame_change_pre.remove(h)
+	bpy.app.handlers.frame_change_pre.remove(h)
 
 for h in [h for h in bpy.app.handlers.render_init if h.__name__ == "on_render_init"]:
-    bpy.app.handlers.render_init.remove(h)
+	bpy.app.handlers.render_init.remove(h)
 
 for h in [h for h in bpy.app.handlers.render_post if h.__name__ == "on_render_post"]:
-    bpy.app.handlers.render_post.remove(h)
+	bpy.app.handlers.render_post.remove(h)
 
 for h in [h for h in bpy.app.handlers.render_complete if h.__name__ == "on_render_complete"]:
-    bpy.app.handlers.render_complete.remove(h)
+	bpy.app.handlers.render_complete.remove(h)
 
 for h in [h for h in bpy.app.handlers.render_cancel if h.__name__ == "on_render_cancel"]:
-    bpy.app.handlers.render_cancel.remove(h)
+	bpy.app.handlers.render_cancel.remove(h)
 
 # Append new handlers
 bpy.app.handlers.frame_change_pre.append(on_frame_change_pre)

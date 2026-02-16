@@ -2,8 +2,12 @@
 Utility functions for dataset directory setup and Blender render configuration.
 """
 
+import json
+import dataclasses
+from datetime import datetime
+from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict
 
 if TYPE_CHECKING:
     from config import DatasetConfig
@@ -66,3 +70,73 @@ def setup_blender_render_path(images_path: Path, transparent: bool = True, frame
     
     print(f"[DatasetUtils] Blender render path set to: {render_path}")
     print(f"[DatasetUtils] Transparent background: {transparent}")
+
+
+def _serialize_value(obj: Any) -> Any:
+    """
+    Recursively serialize a value to a JSON-compatible type.
+    
+    Handles dataclasses, Enums, tuples, Paths, and other common types.
+    """
+    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+        return {f.name: _serialize_value(getattr(obj, f.name)) for f in dataclasses.fields(obj)}
+    elif isinstance(obj, Enum):
+        return obj.name
+    elif isinstance(obj, Path):
+        return str(obj)
+    elif isinstance(obj, (list, tuple)):
+        return [_serialize_value(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {str(k): _serialize_value(v) for k, v in obj.items()}
+    elif isinstance(obj, (int, float, bool, str, type(None))):
+        return obj
+    else:
+        return str(obj)
+
+
+def save_config_json(
+    dataset_dir: Path,
+    dataset_config: "DatasetConfig",
+    configs: Dict[str, Any],
+) -> Path:
+    """
+    Save all configuration settings to a JSON file in the dataset directory.
+    
+    Creates a structured JSON file with metadata and all config sections.
+    The format is extensible — any new fields added to the dataclass configs
+    will automatically be included on the next run.
+    
+    Args:
+        dataset_dir: Root directory of the current dataset (parent of images/labels).
+        dataset_config: The global DatasetConfig instance.
+        configs: Dict mapping section names to config dataclass instances,
+                 e.g. {"camera": CameraRandomConfig(), "scene": SceneRandomConfig(), ...}.
+    
+    Returns:
+        Path to the written JSON file.
+    """
+    import bpy
+
+    output: Dict[str, Any] = {}
+
+    # Metadata block
+    output["metadata"] = {
+        "generated_at": datetime.now().isoformat(),
+        "blender_version": ".".join(str(v) for v in bpy.app.version),
+        "render_engine": bpy.context.scene.render.engine,
+    }
+
+    # Global dataset config
+    output["dataset"] = _serialize_value(dataset_config)
+
+    # All randomizer configs (camera, dart, dartboard, scene, throw, …)
+    for section_name, cfg in configs.items():
+        output[section_name] = _serialize_value(cfg)
+
+    # Write JSON
+    json_path = dataset_dir / "config.json"
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(output, f, indent=4, ensure_ascii=False)
+
+    print(f"[DatasetUtils] Config saved to: {json_path}")
+    return json_path

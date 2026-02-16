@@ -31,8 +31,17 @@ class CameraRandomizer(BaseRandomizer):
         """
         self._randomize_optics(camera, scene)
         target = self._compute_target_location()
-        min_distance = self._compute_min_distance(camera, target)
-        self._randomize_pose(camera, min_distance, target)
+
+        # Sample pose parameters early so the polar angle is available
+        # for the perspective-correct minimum-distance calculation.
+        # (RNG call order is preserved: distance_factor, theta, phi)
+        c = self.config
+        distance_factor = self.rng.uniform(c.distance_factor_min, c.distance_factor_max)
+        theta_rad = math.radians(self.rng.uniform(c.polar_angle_min, c.polar_angle_max))
+        phi_rad = math.radians(self.rng.uniform(c.azimuth_min, c.azimuth_max))
+
+        min_distance = self._compute_min_distance(camera, target, theta_rad)
+        self._randomize_pose(camera, min_distance, target, distance_factor, theta_rad, phi_rad)
         self._randomize_dof(camera)
 
     # ---------------------------------------------------------------------
@@ -52,27 +61,62 @@ class CameraRandomizer(BaseRandomizer):
         c = self.config
         return Vector((self.rng.gauss(0, c.look_jitter_stddev), self.rng.gauss(0, c.look_jitter_stddev), 0.0))
 
-    def _compute_min_distance(self, camera, target=Vector((0,0,0))):
-        """Compute minimal camera distance so the board fits into frame."""
+    def _compute_min_distance(self, camera, target=Vector((0,0,0)), polar_angle_rad: float = 0.0):
+        """Compute minimal camera distance so the board fits into frame.
+
+        Accounts for perspective distortion when viewing the circular
+        dartboard at an oblique polar angle.  Two constraints are checked:
+
+        1. **Tilt axis** – the near edge of the disc is closer to the camera
+           and therefore projects larger on the sensor:
+           d >= R sin(theta) + d0 cos(theta)
+
+        2. **Perpendicular axis** – depth variation along the disc rim
+           slightly increases the required distance:
+           d >= sqrt( (R sin(theta))^2 + d0^2 )
+
+        where d0 = 2fR/s is the head-on minimum distance and R is the
+        effective radius (half the board diameter plus target offset).
+        """
         c = self.config
         if camera.data.sensor_width <= 0 or camera.data.sensor_height <= 0:
             raise ValueError("sensor_width and sensor_height must be > 0")
-        
-        shorter_side = min(camera.data.sensor_width, camera.data.sensor_height)
-        return ((c.board_diameter_m + target.length) * camera.data.lens) / shorter_side
 
-    def _randomize_pose(self, camera, min_distance, target=Vector((0,0,0))):
-        """Place camera on a spherical shell and aim at the dartboard."""
+        R = (c.board_diameter_m + target.length) / 2.0     # effective radius (m)
+        f = camera.data.lens                                # focal length (mm)
+        s = min(camera.data.sensor_width, camera.data.sensor_height)  # mm
+        theta = polar_angle_rad
+
+        # Head-on minimum distance (θ = 0 case, equals previous formula)
+        d0 = 2.0 * f * R / s
+
+        # Tilt direction: near edge is closer → larger projection
+        d_tilt = R * math.sin(theta) + d0 * math.cos(theta)
+
+        # Perpendicular direction: depth spread across the disc rim
+        d_perp = math.sqrt((R * math.sin(theta)) ** 2 + d0 ** 2)
+
+        return max(d_tilt, d_perp)
+
+    def _randomize_pose(self, camera, min_distance, target=Vector((0,0,0)),
+                        distance_factor: float = 1.0,
+                        theta_rad: float = 0.0, phi_rad: float = 0.0):
+        """Place camera on a spherical shell and aim at the dartboard.
+
+        Args:
+            camera: Blender camera object.
+            min_distance: Perspective-corrected minimum distance.
+            target: Look-at target (jittered board center).
+            distance_factor: Pre-sampled multiplier for min_distance.
+            theta_rad: Pre-sampled polar angle in radians.
+            phi_rad: Pre-sampled azimuth angle in radians.
+        """
         c = self.config
 
-        # Distance along sphere
-        r = min_distance * self.rng.uniform(c.distance_factor_min, c.distance_factor_max)
+        # Distance along sphere (factor already sampled in randomize())
+        r = min_distance * distance_factor
 
-        # Spherical coordinates
-        theta = math.radians(self.rng.uniform(c.polar_angle_min, c.polar_angle_max))
-        phi = math.radians(self.rng.uniform(c.azimuth_min, c.azimuth_max))
-
-        x, y, z = sph_to_cart(r, theta, phi)
+        x, y, z = sph_to_cart(r, theta_rad, phi_rad)
         camera.location = Vector((x, y, z))
         
         # Aim at target with calculated Roll
