@@ -28,3 +28,4 @@ nohup_run_*.out
 
 # Benchmarkin
 benchmarking/
+nohup.out
