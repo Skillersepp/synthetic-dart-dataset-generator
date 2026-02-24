@@ -16,14 +16,14 @@ class DatasetConfig:
     
     # Frame range
     start_frame: int = 1
-    end_frame: int = 300000
+    end_frame: int = 200000
     
     # Output paths (relative to project root)
     output_base: str = "output"
     
     # Render settings
     render_engine: str = "EEVEE"  # "CYCLES" or "EEVEE" ("BLENDER_EEVEE_NEXT")
-    render_samples: int = 8
+    render_samples: int = 16
     resolution_x: int = 1024
     resolution_y: int = 1024
     render_transparent: bool = True  # Transparent background for compositing
