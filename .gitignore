@@ -25,3 +25,7 @@ Thumbs.db
 *.out
 nohup*.out
 nohup_run_*.out
+
+# Benchmarkin
+benchmarking/
+nohup.out
