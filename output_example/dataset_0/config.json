@@ -1,0 +1,301 @@
+{
+    "metadata": {
+        "generated_at": "2026-02-16T01:49:36.757772",
+        "blender_version": "4.5.5",
+        "render_engine": "BLENDER_EEVEE_NEXT"
+    },
+    "dataset": {
+        "global_seed": 0,
+        "start_frame": 1,
+        "end_frame": 300000,
+        "output_base": "output",
+        "render_engine": "EEVEE",
+        "render_samples": 8,
+        "resolution_x": 800,
+        "resolution_y": 800,
+        "render_transparent": true
+    },
+    "camera": {
+        "focal_length_min": 20.0,
+        "focal_length_max": 60.0,
+        "sensor_width_min": 8,
+        "sensor_width_max": 36.0,
+        "distance_factor_min": 1.2,
+        "distance_factor_max": 1.2,
+        "polar_angle_min": 0.0,
+        "polar_angle_max": 30.0,
+        "azimuth_min": 0.0,
+        "azimuth_max": 360.0,
+        "look_jitter_stddev": 0.0,
+        "roll_mode": "TWENTY_EXACT_UP",
+        "roll_stddev_deg": 6.0,
+        "roll_min_deg": -18.0,
+        "roll_max_deg": 18.0,
+        "roll_enforce_limits_in_approx_up": true,
+        "board_diameter_m": 0.44,
+        "focus_radius_max_m": 0.225,
+        "aperture_fstop_min": 4.0,
+        "aperture_fstop_max": 8.0
+    },
+    "dart": {
+        "flight_texture_folders": [
+            "assets/textures/dart/flight/flags",
+            "assets/textures/dart/flight/outpainted",
+            "assets/textures/background"
+        ],
+        "tip_length": {
+            "min_val": 20.0,
+            "max_val": 45.0,
+            "fixed": null
+        },
+        "barrel_length": {
+            "min_val": 40.0,
+            "max_val": 55.0,
+            "fixed": null
+        },
+        "barrel_thickness": {
+            "min_val": 0.15,
+            "max_val": 5.0,
+            "fixed": null
+        },
+        "shaft_length": {
+            "min_val": 26.0,
+            "max_val": 56.0,
+            "fixed": null
+        },
+        "shaft_shape_mix": {
+            "min_val": 0.0,
+            "max_val": 1.0,
+            "fixed": null
+        },
+        "flight_insertion_depth": {
+            "min_val": 10.0,
+            "max_val": 20.0,
+            "fixed": null
+        },
+        "randomize_flight_type": true,
+        "fixed_flight_index": 100,
+        "prob_flight_texture": 0.8,
+        "prob_flight_gradient": 0.1,
+        "prob_flight_solid": 0.1,
+        "flight_roughness": {
+            "min_val": 0.0,
+            "max_val": 1.0,
+            "fixed": null
+        },
+        "flight_color_saturation_min": 0.5,
+        "flight_color_saturation_max": 1.0,
+        "flight_color_value_min": 0.5,
+        "flight_color_value_max": 1.0,
+        "prob_shaft_gradient": 0.5,
+        "prob_shaft_solid": 0.5,
+        "shaft_roughness": {
+            "min_val": 0.0,
+            "max_val": 0.8,
+            "fixed": null
+        },
+        "prob_shaft_metallic": 0.5,
+        "barrel_roughness": {
+            "min_val": 0.0,
+            "max_val": 0.5,
+            "fixed": null
+        },
+        "tip_roughness": {
+            "min_val": 0.0,
+            "max_val": 0.5,
+            "fixed": null
+        }
+    },
+    "dartboard": {
+        "randomize_cracks": true,
+        "randomize_holes": true,
+        "randomize_wear": true,
+        "crack_factor": {
+            "min_val": 0.0,
+            "max_val": 1.0,
+            "fixed": null
+        },
+        "hole_factor": {
+            "min_val": 0.0,
+            "max_val": 1.0,
+            "fixed": null
+        },
+        "wear_level": {
+            "min_val": 0.0,
+            "max_val": 1.0,
+            "fixed": null
+        },
+        "wear_contrast": {
+            "min_val": 0.5,
+            "max_val": 1.0,
+            "fixed": null
+        },
+        "field_color_red": {
+            "base_color": [
+                0.8,
+                0.1,
+                0.1,
+                1.0
+            ],
+            "hue_variation": 0.02,
+            "saturation_variation": 0.1,
+            "value_variation": 0.15,
+            "randomize": true
+        },
+        "field_color_green": {
+            "base_color": [
+                0.1,
+                0.5,
+                0.1,
+                1.0
+            ],
+            "hue_variation": 0.02,
+            "saturation_variation": 0.1,
+            "value_variation": 0.15,
+            "randomize": true
+        },
+        "field_color_white": {
+            "base_color": [
+                0.9,
+                0.9,
+                0.85,
+                1.0
+            ],
+            "hue_variation": 0.0,
+            "saturation_variation": 0.5,
+            "value_variation": 0.1,
+            "randomize": true
+        },
+        "field_color_black": {
+            "base_color": [
+                0.02,
+                0.02,
+                0.02,
+                1.0
+            ],
+            "hue_variation": 0.0,
+            "saturation_variation": 0.0,
+            "value_variation": 0.02,
+            "randomize": true
+        },
+        "digit_color": {
+            "base_color": [
+                0.9,
+                0.9,
+                0.9,
+                1.0
+            ],
+            "hue_variation": 0.0,
+            "saturation_variation": 0.0,
+            "value_variation": 0.1,
+            "randomize": true
+        },
+        "outer_ring_mapping": {
+            "randomize": true,
+            "location_x_min": 0.0,
+            "location_x_max": 1.0,
+            "location_y": {
+                "mean": 0.0,
+                "std_dev": 0.1,
+                "min_val": null,
+                "max_val": null
+            },
+            "rotation_z_degrees": {
+                "mean": 0.0,
+                "std_dev": 0.5,
+                "min_val": null,
+                "max_val": null
+            },
+            "scale": {
+                "values": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "weights": [
+                    0.8,
+                    0.1,
+                    0.05,
+                    0.05
+                ]
+            }
+        },
+        "outer_ring_textures_folder": "assets/textures/dartboard/ring",
+        "material_names": {
+            "score_red": "red_score_texture_material",
+            "score_green": "green_score_texture_material",
+            "score_white": "white_score_texture_material",
+            "score_black": "black_score_texture_material",
+            "number_ring": "number_ring",
+            "outer_ring": "outer_ring_texture_material"
+        },
+        "node_group_names": {
+            "score_white_and_color": "group_white_and_color_score_texture",
+            "score_black": "group_black_score_texture",
+            "digit_wear": "group_digit_wear"
+        },
+        "geometry_node_modifiers": {
+            "Dartboard_Digit_Wire": "GeometryNodes",
+            "Dartboard_Digit_Wire_Digits": "GeometryNodes"
+        }
+    },
+    "scene": {
+        "hdri_folder": "assets/HDRIs",
+        "hdri_strength_min": 0.7,
+        "hdri_strength_max": 1.3,
+        "hdri_rotation_min": 0.0,
+        "hdri_rotation_max": 6.28318530718,
+        "background_plane_enabled": true,
+        "background_plane_probability": 0.7,
+        "background_texture_folder": "assets/textures/background",
+        "bg_location_min": [
+            -0.5,
+            -0.5,
+            0.0
+        ],
+        "bg_location_max": [
+            0.5,
+            0.5,
+            0.0
+        ],
+        "bg_rotation_min": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "bg_rotation_max": [
+            0.0,
+            0.0,
+            6.283
+        ],
+        "bg_scale_min": [
+            0.8,
+            0.8,
+            1.0
+        ],
+        "bg_scale_max": [
+            6,
+            6,
+            1.0
+        ]
+    },
+    "throw": {
+        "num_darts": 3,
+        "same_appearance": false,
+        "max_radius": 0.17,
+        "distribution_mode": "GAUSSIAN",
+        "gaussian_sigma_min": 0.005,
+        "gaussian_sigma_max": 0.05,
+        "rot_x_min": -10.0,
+        "rot_x_max": 10.0,
+        "rot_y_min": -10.0,
+        "rot_y_max": 10.0,
+        "rot_z_min": 0.0,
+        "rot_z_max": 360.0,
+        "embed_depth_factor_min": 0.1,
+        "embed_depth_factor_max": 0.8,
+        "allow_darts_outside_board": false,
+        "bouncer_probability": 0.0
+    }
+}
